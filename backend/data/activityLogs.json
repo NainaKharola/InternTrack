@@ -4761,5 +4761,16 @@
     "status": "Success",
     "timestamp": "2026-08-09T21:32:41.438Z",
     "_id": "276d2dd241731bb9aa4bc35a"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-09T21:38:10.546Z",
+    "_id": "cdf870eefdef62cc700f598d"
   }
 ]

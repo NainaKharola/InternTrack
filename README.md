@@ -454,9 +454,6 @@ Graphic Era University
 This project was developed as part of an internship project for **Defence Research and Development Organisation (DRDO)** to automate the complete internship registration and management process.
 
 
-
-
-
 # Cheatsheet 
 # DRDO Internship Registration & Management Portal
 
