@@ -39,8 +39,15 @@ export function getAllocatedStudentCount(students, division, divisions) {
 export function getBranchDivisionRecommendations(divisions, configurations, students, branch) {
   const rows = divisions.map((division) => {
     const configuredSeats = getBranchSeatCapacity(configurations?.[division], branch);
-    const allocatedStudents = getAllocatedStudentCount(students, division, divisions);
-    const availableSeats = calculateAvailableSeats(configuredSeats, allocatedStudents);
+    const allocatedStudents = getAllocatedStudents(students, divisions).filter((student) => (
+      student.trainingManagement?.division === division && student.branch === branch
+    )).length;
+    const divisionCapacity = calculateTotalVacancy(configurations?.[division]);
+    const divisionAllocated = getAllocatedStudentCount(students, division, divisions);
+    const availableSeats = Math.min(
+      calculateAvailableSeats(configuredSeats, allocatedStudents),
+      calculateAvailableSeats(divisionCapacity, divisionAllocated),
+    );
     const isNull = configuredSeats === 0;
     return {
       division,

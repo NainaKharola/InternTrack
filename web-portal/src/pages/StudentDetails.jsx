@@ -9,6 +9,7 @@ import {
   updateStudentDetails,
   deleteAdminStudents,
   updateStudentReview,
+  fetchAdminStudents,
 } from "../services/adminService";
 import {
   generateOfferLetter,
@@ -98,6 +99,17 @@ function DocumentButton({ label, file }) {
   );
 }
 
+function CapacityErrorModal({ error, onClose }) {
+  if (!error) return null;
+  return <div className="capacity-error-modal-backdrop" role="presentation">
+    <section className="capacity-error-modal" role="alertdialog" aria-modal="true" aria-labelledby="capacity-error-title">
+      <h2 id="capacity-error-title">⚠ {error.title}</h2>
+      <p>{error.message}</p>
+      <button className="admin-primary-btn capacity-error-modal__close" type="button" onClick={onClose}>Close</button>
+    </section>
+  </div>;
+}
+
 function addDurationToDate(fromDate, duration) {
   if (!fromDate) return "";
   const date = new Date(fromDate);
@@ -144,6 +156,56 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
   const [dirty, setDirty] = useState(false);
   const initialRender = useRef(true);
   const savedForm = useRef(form);
+  const [divisionStats, setDivisionStats] = useState({});
+  const [capacityError, setCapacityError] = useState(null);
+
+  const loadStats = async () => {
+    try {
+      const [{ administration }, { students }] = await Promise.all([
+        fetchAdministration(),
+        fetchAdminStudents({ sortBy: "submittedAt", sortOrder: "desc" })
+      ]);
+      const stats = {};
+      const branch = form.branch;
+      divisions.forEach((div) => {
+        const config = administration.divisionConfigurations?.[div];
+        const totalVacancy = (config?.allowedBranches || []).reduce((sum, b) => {
+          const seats = config?.branchSeats?.[b];
+          return sum + Math.max(0, Number(seats) || 0);
+        }, 0);
+        const activeStudents = students.filter(s =>
+          s.status === "Approved" &&
+          s.trainingManagement?.division === div &&
+          s.trainingManagement?.completed !== "Yes" &&
+          s._id !== student._id
+        );
+        const branchCapacity = Math.max(0, Number(config?.branchSeats?.[branch]) || 0);
+        const allocatedForBranch = activeStudents.filter((assignedStudent) => assignedStudent.branch === branch).length;
+        const availableSeats = Math.max(0, totalVacancy - activeStudents.length);
+        const branchAvailableSeats = Math.max(0, branchCapacity - allocatedForBranch);
+        const acceptsBranch = Boolean(branch && config?.allowedBranches?.includes(branch) && branchCapacity > 0);
+        stats[div] = {
+          isFull: totalVacancy > 0 && availableSeats === 0,
+          isBranchFull: !acceptsBranch || branchAvailableSeats === 0,
+          availableSeats,
+          branchAvailableSeats,
+        };
+      });
+      setDivisionStats(stats);
+      return stats;
+    } catch (err) {
+      console.error("Failed to load division stats:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, [divisions, student._id, form.branch]);
+
+  const availableDivisionSummary = () => Object.entries(divisionStats)
+    .filter(([, stats]) => !stats.isFull && !stats.isBranchFull)
+    .map(([division, stats]) => `${division} (${Math.min(stats.availableSeats, stats.branchAvailableSeats)} Seats Available)`)
+    .join(", ");
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -163,6 +225,26 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
   };
 
   const save = async (payload = form) => {
+    const latestStats = await loadStats() || divisionStats;
+    const selectedDivisionStats = latestStats[payload.division];
+    if (payload.division && selectedDivisionStats?.isBranchFull && !selectedDivisionStats.isFull) {
+      const alternatives = availableDivisionSummary();
+      const errorMessage = `No available seat for ${payload.branch} in ${payload.division}. This division is currently full.`;
+      setCapacityError({ title: "Cannot Assign Student", message: errorMessage });
+      setMessage(errorMessage);
+      // Keep the branch edit pending. The stored allocation is unchanged until
+      // the administrator selects a division with capacity for that branch.
+      setDirty(false);
+      return;
+    }
+    if (payload.division && selectedDivisionStats?.isFull) {
+      const errorMessage = `${payload.division} has no available seats. This division is currently full.`;
+      setCapacityError({ title: "Cannot Assign Student", message: errorMessage });
+      setMessage(errorMessage);
+      setForm(savedForm.current);
+      setDirty(false);
+      return;
+    }
     if (payload.completed === "Yes") {
       const required = [
         { key: "joined", label: "Joined Status" },
@@ -192,10 +274,15 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
       onUpdated(response.student);
       window.dispatchEvent(new Event("student-division-updated"));
       setMessage(response.message);
+      loadStats();
     } catch (err) {
-      setForm(savedForm.current);
+      if (/no available seat|cannot be assigned|is full/i.test(err.message || "")) setCapacityError({ title: "Cannot Assign Student", message: err.message });
+      if (!/no available seat|cannot be assigned|is full/i.test(err.message || "")) {
+        setForm(savedForm.current);
+      }
       setDirty(false);
-      setMessage(err.message);
+      const alternatives = availableDivisionSummary();
+      setMessage(`${err.message}${alternatives ? ` Available divisions: ${alternatives}.` : ""}`);
     } finally {
       setSaving(false);
     }
@@ -203,6 +290,21 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
 
   const handleDivisionChange = async (event) => {
     const division = event.target.value;
+    const latestStats = await loadStats() || divisionStats;
+    if (division && latestStats[division]?.isBranchFull && !latestStats[division]?.isFull) {
+      const errorMessage = `No available seat for ${form.branch} in ${division}. This division is currently full.`;
+      setCapacityError({ title: "Cannot Assign Student", message: errorMessage });
+      setMessage(errorMessage);
+      event.target.value = form.division;
+      return;
+    }
+    if (division && latestStats[division]?.isFull) {
+      const errorMessage = `${division} has no available seats. This division is currently full.`;
+      setCapacityError({ title: "Cannot Assign Student", message: errorMessage });
+      setMessage(errorMessage);
+      event.target.value = form.division;
+      return;
+    }
     const next = { ...form, division };
 
     setSaving(true);
@@ -214,9 +316,11 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
       onUpdated(response.student);
       window.dispatchEvent(new Event("student-division-updated"));
       setMessage(response.message);
+      loadStats();
     } catch (err) {
       setForm(savedForm.current);
       setMessage(err.message);
+      if (/no available seat|cannot be assigned|is full/i.test(err.message || "")) setCapacityError({ title: "Cannot Assign Student", message: err.message });
     } finally {
       setSaving(false);
     }
@@ -238,6 +342,7 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
 
   return (
     <section className="details-section">
+      <CapacityErrorModal error={capacityError} onClose={() => setCapacityError(null)} />
       <div className="details-section__header">
         <h2>Student Joining Details and Completion</h2>
         {!alwaysOpen && (
@@ -311,7 +416,9 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
       <select name="division" value={form.division} onChange={handleDivisionChange} disabled={saving}>
         <option value="">Select Division</option>
         {[...divisions].sort((a, b) => a.localeCompare(b)).map((division) => (
-          <option key={division} value={division}>{division}</option>
+          <option key={division} value={division}>
+            {divisionStats[division]?.isFull || divisionStats[division]?.isBranchFull ? `${division} (Seats Full)` : division}
+          </option>
         ))}
       </select>
     </label>
@@ -444,6 +551,7 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
   const [editForm, setEditForm] = useState({});
   const [newFiles, setNewFiles] = useState({});
   const [editError, setEditError] = useState("");
+  const [courseBranchError, setCourseBranchError] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
 
   const isFormDirty = () => {
@@ -574,6 +682,7 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
   const handleSaveDetails = async () => {
     setEditSaving(true);
     setEditError("");
+    setCourseBranchError(null);
     try {
       const payload = new FormData();
       Object.entries(editForm).forEach(([key, value]) => {
@@ -593,6 +702,14 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
       window.dispatchEvent(new Event("student-division-updated"));
     } catch (err) {
       setEditError(err.message);
+      if (/No available division\/seat is currently available|capacity|full/i.test(err.message || "")) {
+        setCourseBranchError({ title: "Cannot Change Course/Branch", message: err.message });
+      }
+      setEditForm(current => ({
+        ...current,
+        course: student.course,
+        branch: student.branch,
+      }));
       if (onSaveFailure) onSaveFailure(err.message);
     } finally {
       setEditSaving(false);
@@ -698,6 +815,17 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
 
   return (
     <main className="admin-console admin-shell">
+      <CapacityErrorModal
+        error={courseBranchError}
+        onClose={() => {
+          setCourseBranchError(null);
+          setEditForm(current => ({
+            ...current,
+            course: student.course,
+            branch: student.branch,
+          }));
+        }}
+      />
       <header className="admin-topbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <p className="portal-eyebrow">Student Details</p>

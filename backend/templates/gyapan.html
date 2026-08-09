@@ -1,224 +1,249 @@
 <!doctype html>
 <html lang="hi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>अन्तर्विभागीय ज्ञापन</title>
-    <style>
-      @page {
-        size: A4;
-        margin: 0;
-      }
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-      }
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>अन्तर्विभागीय ज्ञापन</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Arial", sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+      color: #000;
+    }
+
+    .document-container {
+      background-color: #fff;
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 20mm;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      position: relative;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .header-title {
+      text-align: center;
+      font-weight: bold;
+      font-size: 18px;
+      text-decoration: underline;
+      margin-bottom: 25px;
+    }
+
+    .meta-info {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 25px;
+    }
+
+    .meta-left {
+      width: 60%;
+    }
+
+    .meta-right {
+      width: 35%;
+      text-align: left;
+    }
+
+    .subject-title {
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 15px;
+      text-decoration: underline;
+    }
+
+    .intro-text {
+      text-indent: 30px;
+      margin-bottom: 20px;
+      text-align: justify;
+    }
+
+    .student-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 25px;
+      font-size: 13px;
+    }
+
+    .student-table th {
+      font-weight: bold;
+      text-align: left;
+      padding-bottom: 10px;
+      border: none;
+    }
+
+    .student-table td {
+      padding: 6px 0;
+      border: none;
+      vertical-align: top;
+    }
+
+    .student-table th:nth-child(1),
+    .student-table td:nth-child(1) {
+      width: 38%;
+    }
+
+    .student-table th:nth-child(2),
+    .student-table td:nth-child(2) {
+      width: 30%;
+    }
+
+    .student-table th:nth-child(3),
+    .student-table td:nth-child(3) {
+      width: 32%;
+    }
+
+    .main-content {
+      text-align: justify;
+      text-indent: 40px;
+      margin-bottom: 20px;
+    }
+
+    .verification-text {
+      margin-bottom: 60px;
+    }
+
+    .footer-signatures {
+      display: flex;
+      justify-content: space-between;
+      margin: 24px 0;
+    }
+
+    .signature-right {
+      text-align: left;
+      width: 40%;
+      margin-left: auto;
+    }
+
+    .cc-section {
+      margin-top: 24px;
+      margin-bottom: 300px;
+    }
+
+    .cc-title {
+      font-weight: bold;
+      text-decoration: underline;
+      margin-bottom: 10px;
+    }
+
+    .system-footer {
+      width: 100%;
+      margin-top: 200px;
+      bottom: 50px;
+      text-align: center;
+      font-size: 11px;
+      color: #555;
+    }
+
+    @media print {
+
+      html,
       body {
-        font-family: "Arial", sans-serif;
-        background-color: #f4f4f4;
-        margin: 0;
-        padding: 20px;
-        color: #000;
-      }
-      .document-container {
-        background-color: #fff;
         width: 210mm;
-        min-height: 297mm;
-        margin: 0 auto;
+        margin: 0;
+        padding: 0;
+        overflow: visible;
+        background: #fff;
+      }
+
+      .document-container {
+        width: 210mm;
+        min-height: 0;
+        margin: 0;
         padding: 20mm;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        position: relative;
-        font-size: 14px;
-        line-height: 1.6;
+        box-shadow: none;
+        overflow: visible;
       }
-      .header-title {
-        text-align: center;
-        font-weight: bold;
-        font-size: 18px;
-        text-decoration: underline;
-        margin-bottom: 25px;
-      }
-      .meta-info {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 25px;
-      }
-      .meta-left {
-        width: 60%;
-      }
-      .meta-right {
-        width: 35%;
-        text-align: left;
-      }
-      .subject-title {
-        text-align: center;
-        font-weight: bold;
-        margin-bottom: 15px;
-        text-decoration: underline;
-      }
-      .intro-text {
-        text-indent: 30px;
-        margin-bottom: 20px;
-        text-align: justify;
-      }
-      .student-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 25px;
-        font-size: 13px;
-      }
+    }
+  </style>
+</head>
 
-      .student-table th {
-        font-weight: bold;
-        text-align: left;
-        padding-bottom: 10px;
-        border: none;
-      }
+<body>
+  <div class="document-container">
+    <div class="header-title">अन्तर्विभागीय ज्ञापन</div>
 
-      .student-table td {
-        padding: 6px 0;
-        border: none;
-        vertical-align: top;
-      }
-
-      .student-table th:nth-child(1),
-      .student-table td:nth-child(1) {
-        width: 38%;
-      }
-
-      .student-table th:nth-child(2),
-      .student-table td:nth-child(2) {
-        width: 30%;
-      }
-
-      .student-table th:nth-child(3),
-      .student-table td:nth-child(3) {
-        width: 32%;
-      }
-      .main-content {
-        text-align: justify;
-        text-indent: 40px;
-        margin-bottom: 20px;
-      }
-      .verification-text {
-        margin-bottom: 60px;
-      }
-      .footer-signatures {
-        display: flex;
-        justify-content: space-between;
-        margin: 24px 0;
-      }
-      .signature-right {
-        text-align: left;
-        width: 40%;
-        margin-left: auto;
-      }
-      .cc-section {
-        margin-top: 24px;
-      }
-      .cc-title {
-        font-weight: bold;
-        text-decoration: underline;
-        margin-bottom: 10px;
-      }
-      .system-footer {
-        width: 100%;
-        margin-top: 150px;
-        text-align: center;
-        font-size: 11px;
-        color: #555;
-      }
-      @media print {
-        html,
-        body {
-          width: 210mm;
-          margin: 0;
-          padding: 0;
-          overflow: visible;
-          background: #fff;
-        }
-        .document-container {
-          width: 210mm;
-          min-height: 0;
-          margin: 0;
-          padding: 20mm;
-          box-shadow: none;
-          overflow: visible;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="document-container">
-      <div class="header-title">अन्तर्विभागीय ज्ञापन</div>
-
-      <div class="meta-info">
-        <div class="meta-left">
-          <strong>प्रेषक:</strong> संयुक्त निदेशक (एच आर डी)<br />
-          <strong>संख्या:</strong> 47617/टी.सी.
-        </div>
-        <div class="meta-right">
-          <strong>प्रेषित:</strong> GD {{division}}<br />
-          <strong>दिनांक:</strong> {{issueDate}}
-        </div>
+    <div class="meta-info">
+      <div class="meta-left">
+        <strong>प्रेषक:</strong> संयुक्त निदेशक (एच आर डी)<br />
+        <strong>संख्या:</strong> 47617/टी.सी.
       </div>
-
-      <div class="subject-title">
-        विद्यार्थियों हेतु व्यवहारिक प्रशिक्षण/परियोजना कार्य सुविधा
-      </div>
-
-      <div class="intro-text">
-        निम्नलिखित विद्यार्थियों का उनके सामने दर्शायी गयी अवधि के लिए
-        आई.आर.डी.ई. में व्यवहारिक प्रशिक्षण/परियोजना कार्य हेतु चयन किया गया है
-        ।
-      </div>
-
-      <table class="student-table">
-        <thead>
-          <tr>
-            <th>विद्यार्थी का नाम व कक्षा</th>
-            <th>संस्था का नाम</th>
-            <th>अवधि</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{studentRows}}
-        </tbody>
-      </table>
-
-      <div class="main-content">
-        कृपया प्रशिक्षण परियोजना कार्य समाप्ति पर उपरोक्त विद्यार्थियों का कार्य
-        सम्पादन विवरण अनापत्ति प्रमाण पत्र के अनुसार इस विभाग को भेजें,जिससे कि
-        विद्यार्थी को प्रमाण पत्र निर्गत किया जा सके। यह भी सुनिश्चित करें कि
-        परियोजना कार्य/प्रशिक्षण में किसी गोपनीय जानकारी का समावेश न हो ।
-        प्रत्येक विद्यार्थी को अपने परियोजना कार्य से सम्बन्धित एक आख्या की
-        साफ्ट कापी विभाग के प्रभारी अधिकारी के निर्देशन में तैयार करके अनापत्ति
-        प्रमाण पत्र के साथ इस विभाग में जमा करनी होगी। विद्यार्थी परियोजना कार्य
-        समाप्ति तक सभी प्रकार से सह निदेशक (एच आर डी) के नियंत्रण में रहेगा।
-      </div>
-
-      <div class="verification-text">
-        विद्यार्थी का पुलिस प्राधिकारी द्वारा चरित्र एवं पूर्ववृत्त सत्यापन जांच
-        लिया गया है
-      </div>
-
-      <div class="footer-signatures">
-        <div class="signature-right">
-          (VAIBHAV GUPTA)<br />
-          TECHNICAL OFFICER 'C'<br />
-          for Group.Dir (HRD)
-        </div>
-      </div>
-
-      <div class="cc-section">
-        <div class="cc-title">प्रतिलिपि</div>
-        1. सुरक्षा अधिकारी - कृपया अस्थाई द्वार प्रवेश पत्र निर्गत करें।
-      </div>
-
-      <div class="system-footer">
-        Generated by Training Management System, IRDE DEHRADUN
+      <div class="meta-right">
+        <strong>प्रेषित:</strong> GD {{division}}<br />
+        <strong>दिनांक:</strong> {{issueDate}}
       </div>
     </div>
-  </body>
+
+    <div class="subject-title">
+      विद्यार्थियों हेतु व्यवहारिक प्रशिक्षण/परियोजना कार्य सुविधा
+    </div>
+
+    <div class="intro-text">
+      निम्नलिखित विद्यार्थियों का उनके सामने दर्शायी गयी अवधि के लिए
+      आई.आर.डी.ई. में व्यवहारिक प्रशिक्षण/परियोजना कार्य हेतु चयन किया गया है
+      ।
+    </div>
+
+    <table class="student-table">
+      <thead>
+        <tr>
+          <th>विद्यार्थी का नाम व कक्षा</th>
+          <th>संस्था का नाम</th>
+          <th>अवधि</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{studentRows}}
+      </tbody>
+    </table>
+
+    <div class="main-content">
+      कृपया प्रशिक्षण परियोजना कार्य समाप्ति पर उपरोक्त विद्यार्थियों का कार्य
+      सम्पादन विवरण अनापत्ति प्रमाण पत्र के अनुसार इस विभाग को भेजें,जिससे कि
+      विद्यार्थी को प्रमाण पत्र निर्गत किया जा सके। यह भी सुनिश्चित करें कि
+      परियोजना कार्य/प्रशिक्षण में किसी गोपनीय जानकारी का समावेश न हो ।
+      प्रत्येक विद्यार्थी को अपने परियोजना कार्य से सम्बन्धित एक आख्या की
+      साफ्ट कापी विभाग के प्रभारी अधिकारी के निर्देशन में तैयार करके अनापत्ति
+      प्रमाण पत्र के साथ इस विभाग में जमा करनी होगी। विद्यार्थी परियोजना कार्य
+      समाप्ति तक सभी प्रकार से सह निदेशक (एच आर डी) के नियंत्रण में रहेगा।
+    </div>
+
+    <div class="verification-text">
+      विद्यार्थी का पुलिस प्राधिकारी द्वारा चरित्र एवं पूर्ववृत्त सत्यापन जांच
+      लिया गया है
+    </div>
+
+    <div class="footer-signatures">
+      <div class="signature-right">
+        (VAIBHAV GUPTA)<br />
+        TECHNICAL OFFICER 'C'<br />
+        for Group.Dir (HRD)
+      </div>
+    </div>
+
+    <div class="cc-section">
+      <div class="cc-title">प्रतिलिपि</div>
+      1. सुरक्षा अधिकारी - कृपया अस्थाई द्वार प्रवेश पत्र निर्गत करें।
+    </div>
+
+    <div class="system-footer">
+      Generated by Training Management System, IRDE DEHRADUN
+    </div>
+  </div>
+</body>
+
 </html>

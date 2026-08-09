@@ -62,7 +62,7 @@ function AdminLogin() {
     e.preventDefault();
     setForgotError("");
     setForgotSuccess("");
-    if (!answer1.trim() || !answer2.trim() || !newPassword || !confirmPassword) {
+    if (!answer1.trim() || !newPassword || !confirmPassword) {
       setForgotError("All fields are required.");
       return;
     }
@@ -79,8 +79,7 @@ function AdminLogin() {
       const payload = {
         email: forgotEmail,
         answers: [
-          { id: forgotQuestions[0].id, answer: answer1 },
-          { id: forgotQuestions[1].id, answer: answer2 }
+          { id: forgotQuestions[0]?.id || "secret", answer: answer1 }
         ],
         newPassword,
         confirmPassword
@@ -89,7 +88,6 @@ function AdminLogin() {
       setForgotSuccess("Password reset successfully. You can now login with your new password.");
       setForgotEmail("");
       setAnswer1("");
-      setAnswer2("");
       setNewPassword("");
       setConfirmPassword("");
       setTimeout(() => {
@@ -218,31 +216,20 @@ function AdminLogin() {
               flexDirection: "column",
               gap: "16px"
             }}>
-              <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>🔑 Verify Answers</h2>
+              <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>🔑 Verify Answer</h2>
               <p style={{ margin: 0, color: "#475569", fontSize: "0.88rem" }}>
-                Answer the two security questions to reset your password.
+                Answer your secret recovery question to reset your password.
               </p>
               {forgotError && <p className="admin-error" style={{ margin: 0 }}>{forgotError}</p>}
               {forgotSuccess && <p style={{ margin: 0, color: "green", fontSize: "0.9rem", fontWeight: "600" }}>{forgotSuccess}</p>}
               
               <label className="admin-field">
-                <span>Question 1: {forgotQuestions[0]?.question}</span>
+                <span>Secret Question: {forgotQuestions[0]?.question}</span>
                 <input
                   type="text"
                   placeholder="Enter answer"
                   value={answer1}
                   onChange={(e) => setAnswer1(e.target.value)}
-                  required
-                />
-              </label>
-
-              <label className="admin-field">
-                <span>Question 2: {forgotQuestions[1]?.question}</span>
-                <input
-                  type="text"
-                  placeholder="Enter answer"
-                  value={answer2}
-                  onChange={(e) => setAnswer2(e.target.value)}
                   required
                 />
               </label>

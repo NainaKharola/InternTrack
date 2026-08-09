@@ -8,14 +8,12 @@ import {
   createSubUserPassword,
   fetchUserActivityLog,
   downloadUserActivityExport,
-  getSecurityQuestions,
-  saveSecurityQuestion,
-  deleteSecurityQuestion,
+  setupRecoveryInfo,
 } from "../services/adminService";
 import "../styles/admin.css";
 
 export default function AdminProfile() {
-  const { admin, checking } = useAdminAuth();
+  const { admin, checking, validateSession } = useAdminAuth();
 
   // Load User List
   const [users, setUsers] = useState([]);
@@ -50,12 +48,10 @@ export default function AdminProfile() {
   const [changePassLoading, setChangePassLoading] = useState(false);
   const [changePassError, setChangePassError] = useState("");
 
-  // Custom Security Questions States
-  const [securityQuestions, setSecurityQuestions] = useState([]);
-  const [questionsLoading, setQuestionsLoading] = useState(false);
-  const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
-  const [questionForm, setQuestionForm] = useState({ id: "", question: "", answer: "" });
-  const [questionError, setQuestionError] = useState("");
+  // Secret Recovery States
+  const [secretQuestion, setSecretQuestion] = useState("");
+  const [secretAnswer, setSecretAnswer] = useState("");
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   // Form States - Add User
   const [addUserForm, setAddUserForm] = useState({
@@ -245,52 +241,32 @@ export default function AdminProfile() {
     }
   };
 
-  const loadSecurityQuestions = async () => {
-    setQuestionsLoading(true);
-    try {
-      const res = await getSecurityQuestions();
-      setSecurityQuestions(res.questions || []);
-    } catch (err) {
-      setErrorMsg(err.message || "Failed to load security questions.");
-    } finally {
-      setQuestionsLoading(false);
+    useEffect(() => {
+    if (admin?.secretQuestion) {
+      setSecretQuestion(admin.secretQuestion);
     }
-  };
+  }, [admin]);
 
-  useEffect(() => {
-    loadSecurityQuestions();
-  }, []);
-
-  const handleSaveQuestion = async (e) => {
+  const handleSaveRecovery = async (e) => {
     e.preventDefault();
-    setQuestionError("");
-    if (!questionForm.question.trim()) {
-      setQuestionError("Question is required.");
+    if (!secretQuestion.trim()) {
+      setErrorMsg("Secret question is required.");
       return;
     }
-    if (!questionForm.id && !questionForm.answer.trim()) {
-      setQuestionError("Answer is required.");
+    if (!admin?.recoverySetup && !secretAnswer.trim()) {
+      setErrorMsg("Secret answer is required.");
       return;
     }
+    setRecoveryLoading(true);
     try {
-      await saveSecurityQuestion(questionForm);
-      setSuccessMsg("Security question saved successfully.");
-      setIsQuestionModalOpen(false);
-      setQuestionForm({ id: "", question: "", answer: "" });
-      loadSecurityQuestions();
+      await setupRecoveryInfo({ secretQuestion, secretAnswer });
+      setSuccessMsg("Password recovery settings updated successfully.");
+      setSecretAnswer("");
+      await validateSession();
     } catch (err) {
-      setQuestionError(err.message || "Failed to save security question.");
-    }
-  };
-
-  const handleDeleteQuestion = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this security question?")) return;
-    try {
-      await deleteSecurityQuestion(id);
-      setSuccessMsg("Security question deleted successfully.");
-      loadSecurityQuestions();
-    } catch (err) {
-      setErrorMsg(err.message || "Failed to delete security question.");
+      setErrorMsg(err.message || "Failed to save password recovery settings.");
+    } finally {
+      setRecoveryLoading(false);
     }
   };
 
@@ -437,71 +413,42 @@ export default function AdminProfile() {
           </div>
         </section>
 
-        {/* Security Questions Card */}
+        {/* Security Recovery Card */}
         <section className="administration-card">
           <div className="administration-card__heading">
             <span className="administration-icon" aria-hidden="true">🔒</span>
             <div>
-              <h2>Security Questions</h2>
-              <p>Configure custom questions to recover your password offline.</p>
+              <h2>Password Recovery Setup</h2>
+              <p>Configure a secret question and answer to recover your password if forgotten.</p>
             </div>
           </div>
-          <div style={{ marginTop: "20px" }}>
-            <button className="admin-primary-btn" type="button" onClick={() => { setQuestionForm({ id: "", question: "", answer: "" }); setQuestionError(""); setIsQuestionModalOpen(true); }}>
-              + Add Question
-            </button>
-          </div>
-
-          {questionsLoading ? (
-            <div className="administration-loading" style={{ marginTop: "16px" }}><span className="administration-spinner" /> Loading questions...</div>
-          ) : (
-            <div className="recommendation-table-wrap" style={{ marginTop: "16px" }}>
-              <table className="recommendation-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: "10%" }}>S.No.</th>
-                    <th style={{ width: "50%" }}>Question</th>
-                    <th style={{ width: "20%" }}>Answer</th>
-                    <th style={{ width: "20%" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {securityQuestions.map((q, index) => (
-                    <tr key={q.id || index}>
-                      <td>{index + 1}</td>
-                      <td><strong>{q.question}</strong></td>
-                      <td><code style={{ fontSize: "1.1rem", letterSpacing: "2px" }}>{q.answer}</code></td>
-                      <td>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <button
-                            className="admin-secondary-btn"
-                            style={{ padding: "4px 8px", fontSize: "0.85rem" }}
-                            type="button"
-                            onClick={() => { setQuestionForm({ id: q.id, question: q.question, answer: "••••••••" }); setQuestionError(""); setIsQuestionModalOpen(true); }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="admin-danger-btn"
-                            style={{ padding: "4px 8px", fontSize: "0.85rem" }}
-                            type="button"
-                            onClick={() => handleDeleteQuestion(q.id)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {securityQuestions.length === 0 && (
-                    <tr>
-                      <td colSpan="4" style={{ textAlign: "center", padding: "16px", color: "var(--text-muted)" }}>No security questions configured. Add at least two.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          <form onSubmit={handleSaveRecovery} style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "16px", maxWidth: "500px" }}>
+            <label className="admin-field">
+              <span>Secret Question</span>
+              <input
+                type="text"
+                placeholder="e.g. What was the name of your first school?"
+                value={secretQuestion}
+                onChange={(e) => setSecretQuestion(e.target.value)}
+                required
+              />
+            </label>
+            <label className="admin-field">
+              <span>Secret Answer</span>
+              <input
+                type="password"
+                placeholder={admin?.recoverySetup ? "Leave blank to keep existing or enter new answer" : "Enter answer"}
+                value={secretAnswer}
+                onChange={(e) => setSecretAnswer(e.target.value)}
+                required={!admin?.recoverySetup}
+              />
+            </label>
+            <div>
+              <button className="admin-primary-btn" type="submit" disabled={recoveryLoading}>
+                {recoveryLoading ? "Saving..." : "Save Recovery Details"}
+              </button>
             </div>
-          )}
+          </form>
         </section>
 
         {isMainAdmin && (
@@ -1016,49 +963,6 @@ export default function AdminProfile() {
         </div>
       )}
 
-      {isQuestionModalOpen && (
-        <div className="administration-dialog-backdrop" role="presentation">
-          <form className="administration-dialog" onSubmit={handleSaveQuestion} style={{ maxWidth: "450px" }}>
-            <h2>{questionForm.id ? "Edit Security Question" : "Add Security Question"}</h2>
-            <p>Define a custom security question and answer.</p>
-
-            {questionError && <p className="admin-error" style={{ marginBottom: "12px" }}>{questionError}</p>}
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <label className="admin-field">
-                <span>Question</span>
-                <input
-                  type="text"
-                  placeholder="e.g. What was the name of your first pet?"
-                  value={questionForm.question}
-                  onChange={(e) => setQuestionForm({ ...questionForm, question: e.target.value })}
-                  required
-                />
-              </label>
-
-              <label className="admin-field">
-                <span>Answer</span>
-                <input
-                  type="text"
-                  placeholder={questionForm.id ? "Leave blank to keep existing answer" : "Enter answer"}
-                  value={questionForm.answer === "••••••••" ? "" : questionForm.answer}
-                  onChange={(e) => setQuestionForm({ ...questionForm, answer: e.target.value })}
-                  required={!questionForm.id}
-                />
-              </label>
-            </div>
-
-            <div className="administration-dialog__actions" style={{ marginTop: "24px" }}>
-              <button className="admin-secondary-btn" type="button" onClick={() => { setIsQuestionModalOpen(false); setQuestionError(""); }}>
-                Cancel
-              </button>
-              <button className="admin-primary-btn" type="submit">
-                Save
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </main>
   );
 }

@@ -128,22 +128,46 @@ export async function fetchCertificateStudents(date = "", endpoint = "certificat
   return parseResponse(response);
 }
 
-export async function downloadCertificates(ids, endpoint = "certificates", renderMode = "full") {
+export async function downloadCertificates(ids, endpoint = "certificates", renderMode = "full", signatureName = "", signatureDesignation = "") {
+  const safeRenderMode = renderMode === "template" ? "template" : "full";
+  const payload = {
+    ids,
+    renderMode: safeRenderMode,
+    signatureName: signatureName || undefined,
+    signatureDesignation: signatureDesignation || undefined,
+  };
+  console.info("CERTIFICATE GENERATION REQUEST", {
+    url: `${API_URL}/${endpoint}/download`,
+    method: "POST",
+    studentIds: ids,
+    renderMode: safeRenderMode,
+  });
   const response = await fetch(`${API_URL}/${endpoint}/download`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...authHeaders(),
     },
-    body: JSON.stringify(renderMode === "template" ? { ids, renderMode } : { ids }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
+    console.error("CERTIFICATE GENERATION ERROR", {
+      status: response.status,
+      response: body,
+    });
     if (response.status === 401) clearAdminToken();
-    throw new Error(body.message || "Certificate download failed.");
+    const error = new Error(body.message || "Certificate download failed.");
+    error.status = response.status;
+    error.response = body;
+    throw error;
   }
 
+  console.info("CERTIFICATE GENERATION RESPONSE", {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+  });
   return {
     blob: await response.blob(),
     filename:

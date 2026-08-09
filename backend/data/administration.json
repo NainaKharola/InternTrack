@@ -43,15 +43,13 @@
       "allowedBranches": [
         "Electronics and Communication",
         "Electrical Engineering",
-        "Civil Engineering",
         "Aerospace Engineering",
         "Artificial Intelligence and Data Science"
       ],
-      "totalVacancy": 28,
+      "totalVacancy": 19,
       "branchSeats": {
         "Electronics and Communication": 3,
         "Electrical Engineering": 8,
-        "Civil Engineering": 9,
         "Aerospace Engineering": 5,
         "Artificial Intelligence and Data Science": 3
       }
@@ -61,28 +59,30 @@
         "Computer Science and Engineering",
         "Information Technology"
       ],
-      "totalVacancy": 12,
+      "totalVacancy": 11,
       "branchSeats": {
         "Computer Science and Engineering": 10,
-        "Information Technology": 2
+        "Information Technology": 1
       }
     },
     "ALTDS": {
-      "allowedBranches": [],
-      "totalVacancy": 0,
-      "branchSeats": {}
+      "allowedBranches": [
+        "Information Technology"
+      ],
+      "totalVacancy": 2,
+      "branchSeats": {
+        "Information Technology": 2
+      }
     },
     "AV": {
       "allowedBranches": [
         "Mechanical Engineering",
-        "Civil Engineering",
         "Electrical Engineering",
         "Electronics and Communication"
       ],
-      "totalVacancy": 17,
+      "totalVacancy": 11,
       "branchSeats": {
         "Mechanical Engineering": 5,
-        "Civil Engineering": 6,
         "Electrical Engineering": 2,
         "Electronics and Communication": 4
       }
@@ -130,19 +130,17 @@
     "HR": {
       "allowedBranches": [
         "Computer Science and Engineering",
-        "Information Technology",
         "Electrical Engineering",
         "Electronics and Communication",
         "Civil Engineering",
         "Artificial Intelligence and Data Science"
       ],
-      "totalVacancy": 26,
+      "totalVacancy": 19,
       "branchSeats": {
         "Computer Science and Engineering": 2,
-        "Information Technology": 3,
         "Electrical Engineering": 6,
         "Electronics and Communication": 6,
-        "Civil Engineering": 5,
+        "Civil Engineering": 1,
         "Artificial Intelligence and Data Science": 4
       }
     },
@@ -152,11 +150,11 @@
         "Electronics and Communication",
         "Information Technology"
       ],
-      "totalVacancy": 30,
+      "totalVacancy": 21,
       "branchSeats": {
         "Computer Science and Engineering": 10,
         "Electronics and Communication": 10,
-        "Information Technology": 10
+        "Information Technology": 1
       }
     },
     "IRST": {
@@ -245,17 +243,9 @@
       "branchSeats": {}
     },
     "Servo System": {
-      "allowedBranches": [
-        "Computer Science and Engineering",
-        "Information Technology",
-        "Electronics and Communication"
-      ],
-      "totalVacancy": 10,
-      "branchSeats": {
-        "Computer Science and Engineering": 0,
-        "Information Technology": 10,
-        "Electronics and Communication": 0
-      }
+      "allowedBranches": [],
+      "totalVacancy": 0,
+      "branchSeats": {}
     },
     "SS & ST": {
       "allowedBranches": [
@@ -276,9 +266,9 @@
         "Information Technology",
         "Computer Science and Engineering"
       ],
-      "totalVacancy": 7,
+      "totalVacancy": 6,
       "branchSeats": {
-        "Information Technology": 2,
+        "Information Technology": 1,
         "Computer Science and Engineering": 5
       }
     },

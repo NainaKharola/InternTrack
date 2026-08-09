@@ -64,7 +64,15 @@ export default function DivisionBranchAnalytics({ administration, students, load
   const [selectedBranch, setSelectedBranch] = useState(branches[0] || "");
   const [selectedDivision, setSelectedDivision] = useState("");
   const activeDivision = administration.divisions.includes(selectedDivision) ? selectedDivision : administration.divisions[0] || "";
-  const allocated = useMemo(() => getAllocatedStudents(students, administration.divisions), [students, administration.divisions]);
+
+  const analyticsStudents = useMemo(() => {
+    return students.filter((s) => {
+      const completion = String(s.completedStatus || s.trainingManagement?.completed || "").trim().toLowerCase();
+      return completion !== "yes";
+    });
+  }, [students]);
+
+  const allocated = useMemo(() => getAllocatedStudents(analyticsStudents, administration.divisions), [analyticsStudents, administration.divisions]);
 
   const branchRows = useMemo(() => administration.divisions.map((division) => {
     const matched = allocated.filter((student) => student.branch === selectedBranch && student.trainingManagement?.division === division);

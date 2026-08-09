@@ -10,6 +10,7 @@ async function createBrowser() {
     const chromium = require("@sparticuz/chromium");
     const executablePath = await chromium.executablePath();
     console.log("Using Chrome (prod):", executablePath);
+    console.info("PUPPETEER LAUNCH", { environment: "production", executablePath });
     return puppeteer.launch({
       executablePath,
       headless: chromium.headless === false ? true : chromium.headless,
@@ -23,26 +24,32 @@ async function createBrowser() {
     });
   } else {
     const puppeteer = require("puppeteer");
-    console.log("Using Chrome (local):", puppeteer.executablePath());
+    const executablePath = await puppeteer.executablePath();
+    console.info("PUPPETEER LAUNCH", { environment: "development", executablePath });
     return puppeteer.launch({
       headless: true,
       args: [
-        "--headless",
+        "--headless=shell",
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-default-browser-check",
       ],
     });
   }
 }
 
 async function renderPdf(browser, html) {
+  console.info("PUPPETEER PAGE CREATE");
   const page = await browser.newPage();
   try {
     await page.setBypassCSP(true);
     await page.setContent(html, {
       waitUntil: ["domcontentloaded", "networkidle0"],
     });
+    console.info("PUPPETEER HTML LOADED");
     await page.emulateMediaType("print");
     await page.evaluate(async () => {
       const images = Array.from(document.images);
@@ -62,6 +69,7 @@ async function renderPdf(browser, html) {
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
       preferCSSPageSize: true,
     });
+    console.info("PUPPETEER PDF GENERATED", { bytes: pdfBuffer.length });
     return Buffer.from(pdfBuffer);
   } finally {
     await page.close();
@@ -105,7 +113,7 @@ async function generatePdfsFromHtml(htmlDocuments) {
     const browser = await getBrowser();
     return await Promise.all(htmlDocuments.map((html) => renderPdf(browser, html)));
   } catch (error) {
-    console.error("PDF Generation Error:", error);
+    console.error("PUPPETEER ERROR", { message: error.message, stack: error.stack });
     throw error;
   }
 }

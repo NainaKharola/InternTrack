@@ -10,7 +10,7 @@ function signToken(admin) {
     throw new Error("JWT_SECRET is not configured.");
   }
 
-  const role = admin.email === "naina@gmail.com" || admin.email === "vaibhav@gmail.com" ? "MAIN_ADMIN" : (admin.role || "SUB_ADMIN");
+  const role = admin.email === "vaibhav.drdo@gmail.com" ? "MAIN_ADMIN" : (admin.role || "SUB_ADMIN");
 
   return jwt.sign({ id: admin._id, role }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "1d",
@@ -22,8 +22,9 @@ function sanitizeAdmin(admin) {
     id: admin._id,
     name: admin.name,
     email: admin.email,
-    role: admin.email === "naina@gmail.com" || admin.email === "vaibhav@gmail.com" ? "MAIN_ADMIN" : (admin.role || "SUB_ADMIN"),
-    recoverySetup: !!admin.recoverySetup,
+    role: admin.email === "vaibhav.drdo@gmail.com" ? "MAIN_ADMIN" : (admin.role || "SUB_ADMIN"),
+    recoverySetup: !!admin.recoverySetup || !!admin.secretQuestion,
+    secretQuestion: admin.secretQuestion,
   };
 }
 
@@ -213,18 +214,17 @@ async function changeAdminPassword(req, res) {
 
 async function setupRecoveryInfo(req, res) {
   try {
-    const { birthPlace, birthDate } = req.body;
-    if (!birthPlace || !birthDate) {
-      return res.status(400).json({ success: false, message: "Birth place and birth date are required." });
+    const { secretQuestion, secretAnswer } = req.body;
+    if (!secretQuestion || !secretAnswer) {
+      return res.status(400).json({ success: false, message: "Secret question and secret answer are required." });
     }
     const admin = await Admin.findById(req.admin._id);
     if (!admin) {
       return res.status(404).json({ success: false, message: "Admin not found." });
     }
 
-    const bcrypt = require("bcryptjs");
-    admin.birthPlace = await bcrypt.hash(birthPlace.toLowerCase().trim(), 12);
-    admin.birthDate = await bcrypt.hash(birthDate.trim(), 12);
+    admin.secretQuestion = secretQuestion;
+    admin.secretAnswer = secretAnswer;
     admin.recoverySetup = true;
 
     await admin.save();
@@ -233,7 +233,7 @@ async function setupRecoveryInfo(req, res) {
       req,
       module: "Profile",
       action: "Setup Recovery Info",
-      description: "Setup recovery information (birth place and birth date) successfully.",
+      description: "Setup recovery information (secret question and secret answer) successfully.",
       status: "Success",
     });
 
@@ -348,7 +348,7 @@ async function listSubUsers(req, res) {
   try {
     const admins = await Admin.find({});
     const sanitized = admins.map(admin => {
-      const isMain = admin.email === "naina@gmail.com" || admin.email === "vaibhav@gmail.com";
+      const isMain = admin.email === "vaibhav.drdo@gmail.com";
       return {
         id: admin._id,
         name: admin.name,
@@ -375,7 +375,7 @@ async function deleteSubUser(req, res) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    const isMain = admin.email === "naina@gmail.com" || admin.email === "vaibhav@gmail.com";
+    const isMain = admin.email === "vaibhav.drdo@gmail.com";
     if (isMain) {
       return res.status(400).json({ success: false, message: "Permanent Main Administrators cannot be deleted." });
     }
@@ -686,15 +686,14 @@ async function getForgotPasswordQuestions(req, res) {
     if (!admin) {
       return res.status(404).json({ success: false, message: "Admin not found." });
     }
-    const questions = admin.securityQuestions || [];
-    if (questions.length < 2) {
-      return res.status(400).json({ success: false, message: "Admin does not have enough security questions set up." });
+    if (!admin.secretQuestion) {
+      return res.status(400).json({ success: false, message: "Admin does not have a secret question set up." });
     }
     
-    const shuffled = [...questions].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, 2).map(q => ({ id: q.id, question: q.question }));
-    
-    return res.status(200).json({ success: true, questions: selected });
+    return res.status(200).json({
+      success: true,
+      questions: [{ id: "secret", question: admin.secretQuestion }]
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -703,7 +702,7 @@ async function getForgotPasswordQuestions(req, res) {
 async function resetPasswordQuestions(req, res) {
   try {
     const { email, answers, newPassword, confirmPassword } = req.body;
-    if (!email || !answers || answers.length !== 2 || !newPassword || !confirmPassword) {
+    if (!email || !answers || !answers[0] || !newPassword || !confirmPassword) {
       return res.status(400).json({ success: false, message: "All fields are required." });
     }
     if (newPassword.length < 8) {
@@ -713,23 +712,14 @@ async function resetPasswordQuestions(req, res) {
       return res.status(400).json({ success: false, message: "Passwords do not match." });
     }
     
-    const admin = await Admin.findOne({ email }).select("+password");
+    const admin = await Admin.findOne({ email }).select("+password +secretAnswer");
     if (!admin) {
       return res.status(404).json({ success: false, message: "Admin not found." });
     }
     
-    const questions = admin.securityQuestions || [];
-    const bcrypt = require("bcryptjs");
-    
-    for (const ans of answers) {
-      const stored = questions.find(q => q.id === ans.id);
-      if (!stored) {
-        return res.status(400).json({ success: false, message: "Invalid question ID." });
-      }
-      const match = await bcrypt.compare(ans.answer.toLowerCase().trim(), stored.answer);
-      if (!match) {
-        return res.status(400).json({ success: false, message: "Verification failed. Incorrect answers." });
-      }
+    const isMatch = await admin.matchSecretAnswer(answers[0].answer);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: "Incorrect answer." });
     }
     
     admin.password = newPassword;
@@ -738,8 +728,8 @@ async function resetPasswordQuestions(req, res) {
     await logActivity({
       req: { ...req, admin },
       module: "Profile",
-      action: "Reset Password via Custom Security Questions",
-      description: `Reset password via custom security questions for email ${email}.`,
+      action: "Reset Password via Secret Question",
+      description: `Reset password via secret question for email ${email}.`,
       status: "Success",
     });
     

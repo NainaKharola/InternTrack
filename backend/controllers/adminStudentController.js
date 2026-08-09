@@ -11,7 +11,11 @@ const {
   sendRejectionEmail,
 } = require("../services/emailService");
 const { indiaDayRange } = require("../utils/dateRange");
-const { validateDivisionCapacity } = require("../services/divisionCapacityService");
+const {
+  validateDivisionCapacity,
+  validateBranchHasAvailableDivision,
+  withDivisionAllocationLock,
+} = require("../services/divisionCapacityService");
 const { indianStatesAndUnionTerritories } = require("../data/indianStates");
 
 const reviewFields = ["status", "remark", "referenceBy", "recommendedBy"];
@@ -176,7 +180,7 @@ async function getStudents(req, res) {
     const filter = buildStudentFilter(req.query);
     const sort = buildSort(req.query.sortBy, req.query.sortOrder);
     const projection =
-      "_id referenceId name course collegeName location email phone branch year cgpa submittedAt status recommendedBy trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType";
+      "_id referenceId name course collegeName location email phone branch year cgpa submittedAt status recommendedBy trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType completedStatus";
 
     const [
       students,
@@ -275,6 +279,7 @@ async function downloadCertificates(req, res) {
           : [req.body.id].filter(Boolean),
       ),
     ];
+    console.info("CERTIFICATE GENERATION START", { ids, renderMode });
 
     if (!ids.length) {
       return res
@@ -293,6 +298,7 @@ async function downloadCertificates(req, res) {
       _id: { $in: ids },
       status: "Approved",
     }).lean();
+    console.info("CERTIFICATE STUDENT LOOKUP", { requested: ids.length, found: students.length });
 
     if (students.length !== ids.length) {
       return res.status(400).json({
@@ -302,9 +308,18 @@ async function downloadCertificates(req, res) {
       });
     }
 
+    const signatureName = req.body.signatureName || "VAIBHAV GUPTA";
+    const signatureDesignation = req.body.signatureDesignation || "TECHNICAL OFFICER 'C'";
+
     const student = students[0];
+    console.info("CERTIFICATE STUDENT DATA RECEIVED", {
+      studentId: student._id,
+      studentName: student.name,
+      internshipType: student.internshipType || "Unpaid (legacy/default)",
+      trainingManagement: student.trainingManagement,
+    });
     const [pdf] = await generatePdfsFromHtml([
-      generateCertificateHtml(student, renderMode),
+      generateCertificateHtml(student, renderMode, signatureName, signatureDesignation),
     ]);
     if (deleteAfterDownload) {
       await Student.findByIdAndUpdate(student._id, {
@@ -325,8 +340,10 @@ async function downloadCertificates(req, res) {
       "Content-Disposition",
       `attachment; filename="${certificateFileName(student)}"`,
     );
+    console.info("CERTIFICATE RESPONSE RETURNED", { studentId: student._id, bytes: pdf.length });
     return res.status(200).send(pdf);
   } catch (error) {
+    console.error("CERTIFICATE GENERATION ERROR", { message: error.message, stack: error.stack });
     await logActivity({
       req,
       module: "Certificate",
@@ -336,9 +353,9 @@ async function downloadCertificates(req, res) {
     });
 
     if (!res.headersSent) {
-      return res
-        .status(500)
-        .json({ success: false, message: "Certificate generation failed." });
+      const body = { success: false, message: "Certificate generation failed." };
+      if (process.env.NODE_ENV !== "production") body.error = error.message;
+      return res.status(500).json(body);
     }
     res.destroy(error);
   }
@@ -499,7 +516,8 @@ async function deleteStudents(req, res) {
 }
 
 async function saveTrainingManagement(req, res) {
-  try {
+  return withDivisionAllocationLock(async () => {
+   try {
     const student = await Student.findById(req.params.id);
 
     if (!student) {
@@ -566,8 +584,8 @@ async function saveTrainingManagement(req, res) {
       joinedDate:
         req.body.joined === "Yes"
           ? (student.trainingManagement?.joined === "Yes" &&
-              student.trainingManagement?.joinedDate) ||
-            new Date()
+            student.trainingManagement?.joinedDate) ||
+          new Date()
           : null,
       projectTitle: req.body.projectTitle || "",
       projectGuide: req.body.projectGuide || "",
@@ -577,8 +595,8 @@ async function saveTrainingManagement(req, res) {
       completionDate:
         req.body.completed === "Yes"
           ? (student.trainingManagement?.completed === "Yes" &&
-              student.trainingManagement?.completionDate) ||
-            new Date(`${new Date().toLocaleDateString("en-CA")}T12:00:00`)
+            student.trainingManagement?.completionDate) ||
+          new Date(`${new Date().toLocaleDateString("en-CA")}T12:00:00`)
           : null,
       updatedBy: req.admin.email,
       updatedAt: new Date(),
@@ -647,7 +665,7 @@ async function saveTrainingManagement(req, res) {
       student,
       message: "Training details saved successfully.",
     });
-  } catch (error) {
+   } catch (error) {
     await logActivity({
       req,
       module: "Training Management",
@@ -661,7 +679,8 @@ async function saveTrainingManagement(req, res) {
       message: "Unable to save Training Management details.",
       error: error.message,
     });
-  }
+   }
+  });
 }
 
 async function uploadOfferLetter(req, res) {
@@ -748,7 +767,8 @@ async function uploadOfferLetter(req, res) {
 }
 
 async function updateStudentDetails(req, res) {
-  try {
+  return withDivisionAllocationLock(async () => {
+   try {
     const student = await Student.findById(req.params.id);
 
     if (!student) {
@@ -759,6 +779,53 @@ async function updateStudentDetails(req, res) {
     }
 
     const body = req.body;
+
+    const nextBranch = String(body.branch !== undefined ? body.branch : student.branch).trim();
+    const branchChanged = body.branch !== undefined && nextBranch !== student.branch;
+    let targetDivision = student.trainingManagement?.division || "";
+    if (branchChanged && student.status === "Approved") {
+      const { getAdministration } = require("../services/administrationService");
+      const currentDivision = student.trainingManagement?.division;
+      let capacityError = "";
+      
+      if (currentDivision) {
+        capacityError = await validateDivisionCapacity({
+          Student,
+          studentId: student._id,
+          division: currentDivision,
+          branch: nextBranch,
+        });
+      } else {
+        capacityError = "No division assigned.";
+      }
+      
+      if (capacityError) {
+        let foundDivision = null;
+        const administration = await getAdministration();
+        for (const div of administration.divisions) {
+          const divError = await validateDivisionCapacity({
+            Student,
+            studentId: student._id,
+            division: div,
+            branch: nextBranch,
+          });
+          if (!divError) {
+            foundDivision = div;
+            break;
+          }
+        }
+        
+        if (foundDivision) {
+          targetDivision = foundDivision;
+        } else {
+          return res.status(400).json({
+            success: false,
+            code: "COURSE_BRANCH_CAPACITY_UNAVAILABLE",
+            message: `No available division/seat is currently available for ${nextBranch}.`,
+          });
+        }
+      }
+    }
 
     // Validate using the existing validation rules before saving.
     if (body.phone && !/^\d{10}$/.test(body.phone)) {
@@ -858,6 +925,9 @@ async function updateStudentDetails(req, res) {
       student.trainingManagement.collegeLocation = student.location;
       student.trainingManagement.trainingDuration = student.internshipDuration;
       student.trainingManagement.collegeAddress = student.collegeAddress;
+      if (branchChanged && student.status === "Approved") {
+        student.trainingManagement.division = targetDivision;
+      }
     }
 
     if (student.offerLetter) {
@@ -886,7 +956,7 @@ async function updateStudentDetails(req, res) {
       student,
       message: "Student details updated successfully.",
     });
-  } catch (error) {
+   } catch (error) {
     await logActivity({
       req,
       module: "Student Module",
@@ -900,7 +970,8 @@ async function updateStudentDetails(req, res) {
       message: "Unable to update student details.",
       error: error.message,
     });
-  }
+   }
+  });
 }
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;

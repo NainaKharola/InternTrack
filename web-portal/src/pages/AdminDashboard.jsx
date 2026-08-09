@@ -90,7 +90,7 @@ function AdminDashboard() {
 
   // Recovery Setup States
   const [showRecoverySetup, setShowRecoverySetup] = useState(false);
-  const [recoveryForm, setRecoveryForm] = useState({ birthPlace: "", birthDate: "" });
+  const [recoveryForm, setRecoveryForm] = useState({ secretQuestion: "", secretAnswer: "" });
   const [recoveryError, setRecoveryError] = useState("");
   const [recoveryBusy, setRecoveryBusy] = useState(false);
 
@@ -169,6 +169,12 @@ function AdminDashboard() {
   const [managementFieldsOpen, setManagementFieldsOpen] = useState(false);
   const [managementFields, setManagementFields] = useState(() => MANAGEMENT_COLUMNS.map(([key]) => key));
 
+  // Signature customization states
+  const [signature, setSignature] = useState(null);
+  const [signatureDraft, setSignatureDraft] = useState({ name: "VAIBHAV GUPTA", designation: "TECHNICAL OFFICER 'C'" });
+  const [signatureEditorOpen, setSignatureEditorOpen] = useState(false);
+  const [signatureError, setSignatureError] = useState("");
+
   // Inline status dropdown confirmation state (Student Management only)
   const [statusConfirm, setStatusConfirm] = useState(null); // { studentId, oldStatus, newStatus }
   const [statusUpdating, setStatusUpdating] = useState(null); // studentId being updated
@@ -235,17 +241,13 @@ function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (admin && admin.recoverySetup === false) {
-      setShowRecoverySetup(true);
-    } else {
-      setShowRecoverySetup(false);
-    }
+    setShowRecoverySetup(false);
   }, [admin]);
 
   const handleRecoverySetupSubmit = async (e) => {
     e.preventDefault();
     setRecoveryError("");
-    if (!recoveryForm.birthPlace || !recoveryForm.birthDate) {
+    if (!recoveryForm.secretQuestion || !recoveryForm.secretAnswer) {
       setRecoveryError("All fields are required.");
       return;
     }
@@ -517,6 +519,9 @@ function AdminDashboard() {
     setDocumentOutputChoice(false);
     setCertificatePreview(null);
     setDocumentError("");
+    setSignature(null);
+    setSignatureEditorOpen(false);
+    setSignatureError("");
   }, [certificatePreview]);
 
   const documentStudents = useMemo(() => {
@@ -569,13 +574,18 @@ function AdminDashboard() {
   const selectAllDocumentStudents = useCallback(() => setDocumentSelectedIds(documentStudents.map((student) => student._id)), [documentStudents]);
 
   const startDocumentGeneration = useCallback(async (renderMode = null) => {
+    // This function is also invoked from a button. Accept only the two
+    // supported string values so a React click event can never enter state.
+    const selectedRenderMode = renderMode === "template" || renderMode === "full"
+      ? renderMode
+      : null;
     if (!documentSelectedIds.length) return setDocumentError("Select at least one student.");
-    if (documentModal === "certificate" && !renderMode) {
+    if (documentModal === "certificate" && !selectedRenderMode) {
       setDocumentOutputChoice(true);
       return;
     }
     setDocumentOutputChoice(false);
-    setDocumentRenderMode(renderMode || "full");
+    setDocumentRenderMode(selectedRenderMode || "full");
     setDocumentBusy(true); setDocumentError("");
     try {
       if (documentModal === "ism") {
@@ -602,11 +612,51 @@ function AdminDashboard() {
     if (!student) return;
     setDocumentBusy(true); setDocumentError("");
     try {
-      const { blob, filename } = await downloadCertificates([student._id], "certificates", documentRenderMode);
+      console.info("CERTIFICATE GENERATION REQUEST", {
+        studentId: student._id,
+        studentName: student.name,
+        internshipType: student.internshipType || "Unpaid (legacy/default)",
+      });
+      const { blob, filename } = await downloadCertificates(
+        [student._id],
+        "certificates",
+        documentRenderMode,
+        signature?.name || "",
+        signature?.designation || ""
+      );
       setCertificatePreview({ url: URL.createObjectURL(blob), filename });
-    } catch (err) { setDocumentError(`Unable to generate certificate for ${student.name}.`); }
+    } catch (err) {
+      console.error("CERTIFICATE GENERATION ERROR", {
+        studentId: student._id,
+        studentName: student.name,
+        internshipType: student.internshipType || "Unpaid (legacy/default)",
+        status: err.status,
+        response: err.response,
+        error: err,
+      });
+      const detail = import.meta.env.DEV ? ` ${err.message}` : "";
+      setDocumentError(`Unable to generate certificate for ${student.name}.${detail}`);
+    }
     finally { setDocumentBusy(false); }
-  }, [documentIndex, documentQueue, documentRenderMode]);
+  }, [documentIndex, documentQueue, documentRenderMode, signature]);
+
+  const openSignatureEditor = () => { setSignatureDraft(signature || { name: "VAIBHAV GUPTA", designation: "TECHNICAL OFFICER 'C'" }); setSignatureError(""); setSignatureEditorOpen(true); };
+  const saveSignature = () => {
+    const name = signatureDraft.name.trim();
+    const designation = signatureDraft.designation.trim();
+    if (!name) {
+      setSignatureError("Name is required.");
+      return;
+    }
+    if (!designation) {
+      setSignatureError("Designation is required.");
+      return;
+    }
+    setSignature({ name, designation });
+    setSignatureEditorOpen(false);
+    if (certificatePreview?.url) URL.revokeObjectURL(certificatePreview.url);
+    setCertificatePreview(null);
+  };
 
   const downloadCertificate = useCallback(() => {
     if (!certificatePreview) return;
@@ -1264,6 +1314,8 @@ function AdminDashboard() {
             const moveNext = () => {
               if (certificatePreview?.url) URL.revokeObjectURL(certificatePreview.url);
               setCertificatePreview(null);
+              setSignatureEditorOpen(false);
+              setSignatureError("");
               if (documentIndex + 1 >= documentQueue.length) closeDocumentModal();
               else setDocumentIndex((index) => index + 1);
             };
@@ -1293,13 +1345,13 @@ function AdminDashboard() {
                     return <tr key={student._id} style={rowStyle}><td><input type="checkbox" checked={documentSelectedIds.includes(student._id)} onChange={(event) => toggleDocumentStudent(student._id, event.target.checked)} aria-label={`Select ${student.name}`} /></td><td>{student.name}</td><td>{student.referenceId || "-"}</td><td>{student.trainingManagement?.division || "-"}</td><td>{student.trainingManagement?.collegeName || student.collegeName || "-"}</td><td>{student.trainingManagement?.branch || student.branch || "-"}</td><td>{student.trainingManagement?.courseName || student.course || "-"}</td></tr>;
                   })}</tbody></table>{!documentStudents.length && <div className="admin-empty-state">No approved students found.</div>}</div>
                   {documentError && <p className="admin-error">{documentError}</p>}
-                  <div className="admin-actions-row"><button className="admin-primary-btn" type="button" disabled={documentBusy || !documentSelectedIds.length} onClick={startDocumentGeneration}>{documentBusy ? "Generating..." : "Generate"}</button><button className="admin-secondary-btn" type="button" disabled={documentBusy} onClick={closeDocumentModal}>Cancel</button></div>
+                  <div className="admin-actions-row"><button className="admin-primary-btn" type="button" disabled={documentBusy || !documentSelectedIds.length} onClick={() => startDocumentGeneration()}>{documentBusy ? "Generating..." : "Generate"}</button><button className="admin-secondary-btn" type="button" disabled={documentBusy} onClick={closeDocumentModal}>Cancel</button></div>
                 </>) : <>
                   <h2>{documentModal === "ism" ? `ISM ${documentIndex + 1} of ${documentQueue.length}` : `Certificate ${documentIndex + 1} of ${documentQueue.length}`}</h2>
                   <p>{documentModal === "ism" ? `Division: ${currentDocument.gyapan.studentRows?.[0]?.division || "-"}` : <>Student: <strong>{currentDocument.student?.name}</strong></>}</p>
                   {documentModal === "ism" ? <iframe id="dashboard-ism-preview" title="ISM preview" className="certificate-preview-frame" srcDoc={currentDocument.html || "<p>Preview unavailable.</p>"} /> : certificatePreview ? <iframe id="dashboard-certificate-preview" title="Certificate preview" className="certificate-preview-frame" src={certificatePreview.url} /> : <p className="admin-muted">Prepare this certificate to preview, print, or download it.</p>}
                   {documentError && <p className="admin-error">{documentError}</p>}
-                  <div className="admin-actions-row">{documentModal === "certificate" && !certificatePreview ? <button className="admin-primary-btn" type="button" disabled={documentBusy} onClick={prepareCertificate}>{documentBusy ? "Generating..." : "Preview Certificate"}</button> : <><button className="admin-secondary-btn" type="button" onClick={printDocument}>Print</button>{documentModal === "ism" ? <button className="admin-primary-btn" type="button" disabled={documentBusy} onClick={downloadIsm}>{documentBusy ? "Preparing..." : "Download"}</button> : <button className="admin-primary-btn" type="button" onClick={downloadCertificate}>Download</button>}<button className="admin-secondary-btn" type="button" onClick={moveNext}>{documentIndex + 1 === documentQueue.length ? "Finish" : "Next"}</button></>}<button className="admin-secondary-btn" type="button" disabled={documentBusy} onClick={closeDocumentModal}>Close</button></div>
+                  <div className="admin-actions-row">{documentModal === "certificate" && !certificatePreview ? <button className="admin-primary-btn" type="button" disabled={documentBusy} onClick={prepareCertificate}>{documentBusy ? "Generating..." : "Preview Certificate"}</button> : <><button className="admin-secondary-btn" type="button" onClick={printDocument}>Print</button>{documentModal === "ism" ? <button className="admin-primary-btn" type="button" disabled={documentBusy} onClick={downloadIsm}>{documentBusy ? "Preparing..." : "Download"} </button> : <><button className="admin-primary-btn" type="button" onClick={downloadCertificate}>Download</button><button className="admin-secondary-btn" type="button" disabled={documentBusy} onClick={openSignatureEditor}>Edit</button></>}<button className="admin-secondary-btn" type="button" onClick={moveNext}>{documentIndex + 1 === documentQueue.length ? "Finish" : "Next"}</button></>}<button className="admin-secondary-btn" type="button" disabled={documentBusy} onClick={closeDocumentModal}>Close</button></div>
                 </>}
               </section>
             </div>;
@@ -1455,22 +1507,23 @@ function AdminDashboard() {
             {recoveryError && <p className="admin-error" style={{ margin: 0 }}>{recoveryError}</p>}
 
             <label className="admin-field">
-              <span>Birth Place</span>
+              <span>Secret Question</span>
               <input
                 type="text"
-                placeholder="e.g. Dehradun"
-                value={recoveryForm.birthPlace}
-                onChange={(e) => setRecoveryForm({ ...recoveryForm, birthPlace: e.target.value })}
+                placeholder="e.g. What was the name of your first school?"
+                value={recoveryForm.secretQuestion}
+                onChange={(e) => setRecoveryForm({ ...recoveryForm, secretQuestion: e.target.value })}
                 required
               />
             </label>
 
             <label className="admin-field">
-              <span>Birth Date</span>
+              <span>Secret Answer</span>
               <input
-                type="date"
-                value={recoveryForm.birthDate}
-                onChange={(e) => setRecoveryForm({ ...recoveryForm, birthDate: e.target.value })}
+                type="password"
+                placeholder="Enter answer"
+                value={recoveryForm.secretAnswer}
+                onChange={(e) => setRecoveryForm({ ...recoveryForm, secretAnswer: e.target.value })}
                 required
               />
             </label>
@@ -1544,6 +1597,26 @@ function AdminDashboard() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {signatureEditorOpen && (
+        <div className="certificate-modal-backdrop" role="dialog" aria-modal="true" aria-label="Edit authorized officer">
+          <form className="certificate-modal" onSubmit={(event) => { event.preventDefault(); saveSignature(); }}>
+            <h2>Edit Authorized Officer</h2>
+            <label className="admin-field">
+              <span>Name</span>
+              <input autoFocus value={signatureDraft.name} onChange={(event) => setSignatureDraft((current) => ({ ...current, name: event.target.value }))} />
+            </label>
+            <label className="admin-field">
+              <span>Designation</span>
+              <input value={signatureDraft.designation} onChange={(event) => setSignatureDraft((current) => ({ ...current, designation: event.target.value }))} />
+            </label>
+            {signatureError && <p className="admin-error" style={{ color: "red" }}>{signatureError}</p>}
+            <div className="admin-actions-row">
+              <button className="admin-primary-btn" type="submit">Save</button>
+              <button className="admin-secondary-btn" type="button" onClick={() => setSignatureEditorOpen(false)}>Cancel</button>
+            </div>
+          </form>
         </div>
       )}
     </main>
