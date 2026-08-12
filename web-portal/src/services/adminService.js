@@ -93,6 +93,21 @@ export async function deleteAdminStudents(ids) {
   return parseResponse(response);
 }
 
+export async function downloadAttendanceReportPdf(html) {
+  const response = await fetch(`${API_URL}/attendance-report/pdf`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ html }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to generate PDF report.");
+  }
+  return response.blob();
+}
+
 export async function updateStudentReview(id, payload) {
   const response = await fetch(`${API_URL}/students/${id}/review`, {
     method: "PATCH",

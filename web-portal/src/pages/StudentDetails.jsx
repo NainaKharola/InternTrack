@@ -926,70 +926,7 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
         </div>
       )}
 
-      {isEditing ? (
-        <section className="details-section">
-          <h2>Personal Details</h2>
-          <div className="details-grid">
-            <label className="admin-field">
-              <span>Name</span>
-              <input
-                value={editForm.name}
-                onChange={(e) => handleEditChange("name", e.target.value)}
-              />
-            </label>
-            <label className="admin-field">
-              <span>Date of Birth</span>
-              <input
-                type="date"
-                value={editForm.dob}
-                onChange={(e) => handleEditChange("dob", e.target.value)}
-              />
-            </label>
-            <label className="admin-field">
-              <span>Gender</span>
-              <select value={editForm.gender} onChange={(e) => handleEditChange("gender", e.target.value)}>
-                <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            </label>
-            <label className="admin-field">
-              <span>Phone Number</span>
-              <input
-                value={editForm.phone}
-                onChange={(e) => handleEditChange("phone", e.target.value)}
-              />
-            </label>
-            <label className="admin-field">
-              <span>Email</span>
-              <input
-                value={editForm.email}
-                onChange={(e) => handleEditChange("email", e.target.value)}
-              />
-            </label>
-            <label className="admin-field">
-              <span>Aadhaar Number</span>
-              <input
-                value={editForm.aadhaarNumber}
-                onChange={(e) => handleEditChange("aadhaarNumber", e.target.value)}
-              />
-            </label>
-          </div>
-        </section>
-      ) : (
-        <DetailGrid
-          title="Personal Details"
-          rows={[
-            ["Name", student.name],
-            ["Gender", student.gender || "Not Provided"],
-            ["Date of Birth", student.dob],
-            ["Phone Number", student.phone],
-            ["Email", student.email],
-            ["Aadhaar Number", student.aadhaarNumber || "-"],
-          ]}
-        />
-      )}
+
 
       {!isApprovedView && (isEditing ? (
         <section className="details-section">

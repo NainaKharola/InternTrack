@@ -11,6 +11,7 @@ import {
   fetchAdminStudents,
   updateStudentReview,
   setupRecoveryInfo,
+  downloadAttendanceReportPdf,
 } from "../services/adminService";
 import { createGyapanPreview, generateGyapanPdf } from "../services/gyapanService";
 import { downloadOfferLetterPdf } from "../services/offerLetterService";
@@ -19,6 +20,32 @@ import { useAdminAuth } from "../auth/useAdminAuth";
 import StudentForm from "../components/Form/StudentForm";
 import StudentDetails from "./StudentDetails";
 import "../styles/admin.css";
+
+const escapeHtml = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function formatReportDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return String(value);
+  const day = String(date.getDate()).padStart(2, '0');
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
+}
+
+function formatDob(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) {
+    if (typeof value === "string" && value.includes("/")) return value;
+    return "";
+  }
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
 
 const initialFilters = {
   collegeName: "",
@@ -67,6 +94,9 @@ function getInitialView() {
   if (path.startsWith("/admin/approved-students")) {
     return "approved-students";
   }
+  if (path.startsWith("/admin/quarterly-reports")) {
+    return "quarterly-reports";
+  }
   if (path.startsWith("/admin/administration")) {
     return "administration";
   }
@@ -85,8 +115,18 @@ function AdminDashboard() {
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [saveTrigger, setSaveTrigger] = useState(0);
+  const [quarterlySubView, setQuarterlySubView] = useState("menu");
   const [showTypeModal, setShowTypeModal] = useState(false);
-  const [newStudentType, setNewStudentType] = useState("");
+  const [proformaQuarterEnding, setProformaQuarterEnding] = useState("");
+  const [proformaSection1, setProformaSection1] = useState({
+    B_lab: "", B_remark: "",
+    C_lab: "", C_remark: "",
+    D_lab: "", D_remark: "",
+    E_lab: "", E_remark: "",
+    F_lab: "", F_remark: ""
+  });
+  const [proformaStudents, setProformaStudents] = useState([]);
+
 
   // Recovery Setup States
   const [showRecoverySetup, setShowRecoverySetup] = useState(false);
@@ -145,6 +185,47 @@ function AdminDashboard() {
       sessionStorage.setItem("approved_sort", JSON.stringify(sort));
     }
   }, [sort]);
+
+  useEffect(() => {
+    if (quarterlySubView === "proforma" && allStudents.length > 0) {
+      const approvedPaid = allStudents.filter(
+        (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
+      );
+      const mapped = approvedPaid.map((student) => {
+        const project = student.paidInternshipProjectDetails || {};
+        const training = student.trainingManagement || {};
+        const discipline = `${student.course || ""} - ${student.branch || ""}`;
+        const joiningDate = training.fromDate ? formatReportDate(training.fromDate) : "";
+        const completionDate = training.toDate ? formatReportDate(training.toDate) : "";
+        const resignationDate = student.resignationStatus === "Yes" && student.resignationDate ? formatReportDate(student.resignationDate) : "";
+
+        return {
+          _id: student._id,
+          name: student.name || "",
+          discipline: discipline || "",
+          gender: student.gender || "",
+          dob: formatDob(student.dob),
+          joiningDate: joiningDate || "",
+          projectName: project.projectName || "",
+          designationTitle: project.designationTitle || "",
+          supervisorName: project.supervisorName || "",
+          projectNameAndPdc: project.projectNameAndPdc || "",
+          achievements: project.achievements || "",
+          completionDate: completionDate || "",
+          resignationDate: resignationDate || "",
+          remarks: ""
+        };
+      });
+      setProformaStudents(mapped);
+    }
+  }, [quarterlySubView, allStudents]);
+
+  useEffect(() => {
+    if (quarterlySubView && quarterlySubView !== "menu") {
+      loadAll();
+    }
+  }, [quarterlySubView]);
+
   const [loading, setLoading] = useState(true);
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -368,6 +449,9 @@ function AdminDashboard() {
       } else if (nextView === "approved-students") {
         dest = "/admin/approved-students";
         setFilters({ ...initialFilters, status: "Approved" });
+      } else if (nextView === "quarterly-reports") {
+        dest = "/admin/quarterly-reports";
+        setQuarterlySubView("menu");
       } else if (nextView === "administration") {
         dest = "/admin/administration";
       } else {
@@ -442,6 +526,8 @@ function AdminDashboard() {
       } else if (action.payload === "approved-students") {
         dest = "/admin/approved-students";
         setFilters({ ...initialFilters, status: "Approved" });
+      } else if (action.payload === "quarterly-reports") {
+        dest = "/admin/quarterly-reports";
       } else if (action.payload === "administration") {
         dest = "/admin/administration";
       } else {
@@ -707,6 +793,496 @@ function AdminDashboard() {
     } catch (err) { setDocumentError(err.message || "Unable to download ISM."); }
     finally { setDocumentBusy(false); }
   }, [documentIndex, documentQueue, allStudents]);
+
+  const getProformaHtml = useCallback((forExport = false) => {
+    const approvedPaidCount = allStudents.filter(
+      (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
+    ).length;
+
+    const rowsHtml = proformaStudents
+      .map((s, index) => {
+        return `
+          <tr>
+            <td class="center">${index + 1}</td>
+            <td>${escapeHtml(s.name)}</td>
+            <td>${escapeHtml(s.discipline)}</td>
+            <td>${escapeHtml(s.gender)}</td>
+            <td>${escapeHtml(s.dob)}</td>
+            <td>${escapeHtml(s.joiningDate)}</td>
+            <td>${escapeHtml(s.projectName)}</td>
+            <td>${escapeHtml(s.designationTitle)}</td>
+            <td>${escapeHtml(s.supervisorName)}</td>
+            <td>${escapeHtml(s.projectNameAndPdc)}</td>
+            <td>${escapeHtml(s.achievements)}</td>
+            <td>${escapeHtml(s.completionDate)}</td>
+            <td>${escapeHtml(s.resignationDate)}</td>
+            <td>${escapeHtml(s.remarks)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Proforma for Quarterly Report in R/O DRDO Paid Internship Scheme</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            margin: 10px;
+            color: #000;
+        }
+
+        .title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+
+        .sub-title {
+            text-align: right;
+            font-size: 10px;
+            margin-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        th, td {
+            border: 1px solid #000;
+            padding: 3px 4px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            text-align: center;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .right {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="title">
+        PROFORMA FOR QUARTERLY REPORT IN R/O DRDO PAID INTERNSHIP SCHEME
+    </div>
+
+    <div class="sub-title">
+        To be maintained at DG Cluster / Lab Level
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th colspan="10" style="text-align: left; background: none; border: none; padding: 10px 0;">
+                    <h3>Quarterly report for quarter ending: ${escapeHtml(proformaQuarterEnding || "........")}</h3>
+                    <h3>1. BRIEF OF REPORT:</h3>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="5"></td>
+                <td>DG Cluster</td>
+                <td colspan="2">Lab / Estt</td>
+                <td colspan="2">Remark</td>
+            </tr>
+
+            <tr>
+                <td colspan="4">A</td>
+                <td>Authorization of Intern:</td>
+                <td class="center">Total students = ${approvedPaidCount}</td>
+                <td colspan="2" class="center">IRDE</td>
+                <td colspan="2"></td>
+            </tr>
+
+            <tr>
+                <td colspan="4">B</td>
+                <td>
+                    Held Strength of Intern / candidate:<br>
+                    (i) Engaged in Projects<br>
+                    (ii) Engaged in other R&D activity
+                </td>
+                <td class="center"></td>
+                <td colspan="2" class="center">${escapeHtml(proformaSection1.B_lab)}</td>
+                <td colspan="2">${escapeHtml(proformaSection1.B_remark)}</td>
+            </tr>
+
+            <tr>
+                <td colspan="4">C</td>
+                <td>
+                    Vacant Intern / Candidate:<br>
+                    (i) Under selection and likely to be engaged in Project / R&D activity<br>
+                    (ii) Not under selection
+                </td>
+                <td class="center"></td>
+                <td colspan="2" class="center">${escapeHtml(proformaSection1.C_lab)}</td>
+                <td colspan="2">${escapeHtml(proformaSection1.C_remark)}</td>
+            </tr>
+
+            <tr>
+                <td colspan="4">D</td>
+                <td>Internship awarded in the reporting period:</td>
+                <td class="center"></td>
+                <td colspan="2" class="center">${escapeHtml(proformaSection1.D_lab)}</td>
+                <td colspan="2">${escapeHtml(proformaSection1.D_remark)}</td>
+            </tr>
+
+            <tr>
+                <td colspan="4">E</td>
+                <td>Intern / candidate resigned / terminated in the reporting period:</td>
+                <td class="center"></td>
+                <td colspan="2" class="center">${escapeHtml(proformaSection1.E_lab)}</td>
+                <td colspan="2">${escapeHtml(proformaSection1.E_remark)}</td>
+            </tr>
+
+            <tr>
+                <td colspan="4">F</td>
+                <td>Details of achievement:</td>
+                <td colspan="2"></td>
+                <td class="center">${escapeHtml(proformaSection1.F_lab)}</td>
+                <td colspan="2">${escapeHtml(proformaSection1.F_remark)}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <br>
+
+    <table>
+        <thead>
+            <tr>
+                <th colspan="14" style="text-align: left; background: none; border: none; padding: 10px 0;">
+                    <h3>2. DETAILS IN R/O EACH INTERN:</h3>
+                </th>
+            </tr>
+            <tr>
+                <th>S.No</th>
+                <th>Name of Intern</th>
+                <th>Discipline</th>
+                <th>Gender</th>
+                <th>Date of Birth</th>
+                <th>Date of joining the Lab</th>
+                <th>Name of Project</th>
+                <th>Title of assignment</th>
+                <th>Name of the Supervisor</th>
+                <th>Name & PDC of the Project in which working</th>
+                <th>Achievements</th>
+                <th>Date of Completion of internship</th>
+                <th>Date of Resignation, if applicable</th>
+                <th>Remarks</th>
+            </tr>
+            <tr class="center">
+                <td style="mso-number-format:'\\@';"></td>
+                <td style="mso-number-format:'\\@';">(1)</td>
+                <td style="mso-number-format:'\\@';">(2)</td>
+                <td style="mso-number-format:'\\@';">(3)</td>
+                <td style="mso-number-format:'\\@';">(4)</td>
+                <td style="mso-number-format:'\\@';">(5)</td>
+                <td style="mso-number-format:'\\@';">(6)</td>
+                <td style="mso-number-format:'\\@';">(7)</td>
+                <td style="mso-number-format:'\\@';">(8)</td>
+                <td style="mso-number-format:'\\@';">(9)</td>
+                <td style="mso-number-format:'\\@';">(10)</td>
+                <td style="mso-number-format:'\\@';">(11)</td>
+                <td style="mso-number-format:'\\@';">(12)</td>
+                <td style="mso-number-format:'\\@';">(13)</td>
+            </tr>
+        </thead>
+        <tbody>
+            ${rowsHtml || '<tr><td colspan="14" class="center">No student records found.</td></tr>'}
+        </tbody>
+    </table>
+
+</body>
+</html>`;
+  }, [allStudents, proformaQuarterEnding, proformaSection1, proformaStudents]);
+
+  const downloadProformaExcel = useCallback(() => {
+    const htmlContent = getProformaHtml(true);
+    const blob = new Blob(["\ufeff", htmlContent], { type: "application/vnd.ms-excel;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Proforma_Quarterly_Report.xls`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, [getProformaHtml]);
+
+  const handleProformaPrint = useCallback(() => {
+    const htmlContent = getProformaHtml(true);
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    } else {
+      alert("Popup blocked! Please allow popups for this site.");
+    }
+  }, [getProformaHtml]);
+
+  const getAttendanceReportHtml = useCallback((quarter) => {
+    const approvedPaidStudents = allStudents.filter(
+      (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
+    );
+
+    const rowsHtml = approvedPaidStudents
+      .map((student, index) => {
+        const report = quarter === 1 ? student.firstQuarterReport : student.secondQuarterReport;
+        const bank = student.bankDetails || {};
+        
+        let period = "-";
+        if (report?.fromDate && report?.toDate) {
+          const fromDateFormatted = formatReportDate(report.fromDate);
+          const toDateFormatted = formatReportDate(report.toDate);
+          period = `${fromDateFormatted} - ${toDateFormatted}`;
+        }
+        
+        const days = report?.daysPresent !== undefined && report?.daysPresent !== "" ? report.daysPresent : "-";
+
+        return `
+          <tr>
+            <td class="center">${index + 1}</td>
+            <td>${escapeHtml(student.name)}</td>
+            <td class="center">${escapeHtml(period)}</td>
+            <td class="center">${escapeHtml(days)}</td>
+            <td>${escapeHtml(bank.bankName || "-")}</td>
+            <td>${escapeHtml(bank.savingAccountNumber || "-")}</td>
+            <td>${escapeHtml(bank.ifsc || "-")}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Attendance Report for the last 3 months period</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            margin: 20px;
+            color: #000;
+        }
+
+        .header-container {
+            text-align: right;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        th, td {
+            border: 1px solid #000;
+            padding: 6px 8px;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            text-align: center;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .right {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="title">
+        Attendance Report for the last 3 months period
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>SRNO</th>
+                <th>STUDENT NAME</th>
+                <th>PERIOD</th>
+                <th>No. of Present (DAYS)</th>
+                <th>BANK NAME</th>
+                <th>Saving A/c no</th>
+                <th>IFSC</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${rowsHtml || '<tr><td colspan="7" class="center">No student records found.</td></tr>'}
+        </tbody>
+    </table>
+
+</body>
+</html>`;
+  }, [allStudents]);
+
+  const downloadExcel = useCallback((quarter) => {
+    const approvedPaidStudents = allStudents.filter(
+      (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
+    );
+    const headers = ["SRNO", "STUDENT NAME", "PERIOD", "No. of Present (DAYS)", "BANK NAME", "Saving A/c no", "IFSC"];
+    const rows = approvedPaidStudents.map((student, index) => {
+      const report = quarter === 1 ? student.firstQuarterReport : student.secondQuarterReport;
+      const bank = student.bankDetails || {};
+      let period = "-";
+      if (report?.fromDate && report?.toDate) {
+        period = `${formatReportDate(report.fromDate)} - ${formatReportDate(report.toDate)}`;
+      }
+      const days = report?.daysPresent !== undefined && report?.daysPresent !== "" ? report.daysPresent : "-";
+      return [
+        index + 1,
+        student.name,
+        period,
+        days,
+        bank.bankName || "-",
+        bank.savingAccountNumber || "-",
+        bank.ifsc || "-"
+      ];
+    });
+    
+    const csvContent = [headers.join(","), ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\r\n");
+    const blob = new Blob(["\ufeff", csvContent], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Attendance_Report_Quarter_${quarter}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, [allStudents]);
+
+  const handleDownloadPdf = useCallback(async (quarter) => {
+    try {
+      const htmlContent = getAttendanceReportHtml(quarter);
+      const blob = await downloadAttendanceReportPdf(htmlContent);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Attendance_Report_Quarter_${quarter}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Failed to download PDF: " + err.message);
+    }
+  }, [getAttendanceReportHtml]);
+
+  const handlePrint = useCallback((quarter) => {
+    const htmlContent = getAttendanceReportHtml(quarter);
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    } else {
+      alert("Popup blocked! Please allow popups for this site.");
+    }
+  }, [getAttendanceReportHtml]);
+
+  const updateSection1 = (key, value) => {
+    setProformaSection1((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateStudentRow = (index, field, value) => {
+    setProformaStudents((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const renderQuarterTable = (quarter) => {
+    const approvedPaidStudents = allStudents.filter(
+      (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
+    );
+
+    return (
+      <div style={{ marginTop: "24px", background: "#fff", padding: "24px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)" }}>
+        <h3 style={{ textAlign: "center", marginBottom: "20px" }}>Attendance Report for the last 3 months period</h3>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", color: "#000" }}>
+            <thead>
+              <tr style={{ backgroundColor: "#f2f2f2" }}>
+                <th style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>SRNO</th>
+                <th style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>STUDENT NAME</th>
+                <th style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>PERIOD</th>
+                <th style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>No. of Present (DAYS)</th>
+                <th style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>BANK NAME</th>
+                <th style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>Saving A/c no</th>
+                <th style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>IFSC</th>
+              </tr>
+            </thead>
+            <tbody>
+              {approvedPaidStudents.length > 0 ? (
+                approvedPaidStudents.map((student, index) => {
+                  const report = quarter === 1 ? student.firstQuarterReport : student.secondQuarterReport;
+                  const bank = student.bankDetails || {};
+                  let period = "-";
+                  if (report?.fromDate && report?.toDate) {
+                    period = `${formatReportDate(report.fromDate)} - ${formatReportDate(report.toDate)}`;
+                  }
+                  const days = report?.daysPresent !== undefined && report?.daysPresent !== "" ? report.daysPresent : "-";
+                  return (
+                    <tr key={student._id}>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>{index + 1}</td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>{student.name}</td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>{period}</td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>{days}</td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>{bank.bankName || "-"}</td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>{bank.savingAccountNumber || "-"}</td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>{bank.ifsc || "-"}</td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="7" style={{ border: "1px solid #000", padding: "12px", textAlign: "center" }}>No student records found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   const openAdministration = useCallback(() => {
     window.history.pushState({}, "", "/admin/system-configuration");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -936,6 +1512,7 @@ function AdminDashboard() {
             {currentView === "student-management" && "Student Management"}
             {currentView === "approved-students" && "Approved Students"}
             {currentView === "administration" && "Administration Options"}
+            {currentView === "quarterly-reports" && "Quarterly Reports"}
           </h1>
         </div>
         <div className="admin-topbar__actions">
@@ -974,6 +1551,344 @@ function AdminDashboard() {
             <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>📊 Reports</h2>
             <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.95rem" }}>Filter approved, joined, and completed students and export a tailored report.</p>
           </div>
+          <div className="admin-summary-card admin-summary-card--interactive" onClick={() => handleSwitchViewWithCheck("quarterly-reports")} style={{ cursor: "pointer", padding: "32px", display: "flex", flexDirection: "column", gap: "12px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)", transition: "transform 0.2s, box-shadow 0.2s" }}>
+            <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>📅 Quarterly Reports</h2>
+            <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.95rem" }}>Open Proforma for Quarterly Reports and Attendance Reports.</p>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 5: Quarterly Reports View */}
+      {currentView === "quarterly-reports" && (
+        <div style={{ padding: "24px 0" }}>
+          {quarterlySubView === "menu" && (
+            <div className="admin-dashboard-home-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px", marginTop: "20px" }}>
+              <div className="admin-summary-card" style={{ padding: "32px", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "16px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)" }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>📝 Proforma for Quarterly Report</h2>
+                  <p style={{ margin: "8px 0 0 0", color: "var(--text-muted)", fontSize: "0.95rem" }}>Open the module for Quarterly Report Proformas.</p>
+                </div>
+                <button className="admin-primary-btn" type="button" onClick={() => setQuarterlySubView("proforma")} style={{ width: "fit-content", padding: "8px 24px", height: "auto" }}>Open</button>
+              </div>
+              <div className="admin-summary-card" style={{ padding: "32px", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "16px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)" }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>📅 Attendance Report</h2>
+                  <p style={{ margin: "8px 0 0 0", color: "var(--text-muted)", fontSize: "0.95rem" }}>Open the module for Attendance Reports.</p>
+                </div>
+                <button className="admin-primary-btn" type="button" onClick={() => setQuarterlySubView("attendance")} style={{ width: "fit-content", padding: "8px 24px", height: "auto" }}>Open</button>
+              </div>
+            </div>
+          )}
+
+          {quarterlySubView === "attendance" && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                <h2 style={{ margin: 0 }}>Attendance Report Options</h2>
+                <button className="admin-secondary-btn" type="button" onClick={() => setQuarterlySubView("menu")}>Back</button>
+              </div>
+              <div className="admin-dashboard-home-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px" }}>
+                <div className="admin-summary-card" style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "16px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)" }}>
+                  <h3 style={{ margin: 0, color: "var(--primary)" }}>First Quarter Report</h3>
+                  <p style={{ margin: 0, color: "var(--text-muted)" }}>Generate attendance report for the first 3 months.</p>
+                  <button className="admin-primary-btn" type="button" onClick={() => setQuarterlySubView("first-quarter")} style={{ width: "fit-content", padding: "8px 24px", height: "auto" }}>Open</button>
+                </div>
+                <div className="admin-summary-card" style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "16px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)" }}>
+                  <h3 style={{ margin: 0, color: "var(--primary)" }}>Second Quarter Report</h3>
+                  <p style={{ margin: 0, color: "var(--text-muted)" }}>Generate attendance report for the second 3 months.</p>
+                  <button className="admin-primary-btn" type="button" onClick={() => setQuarterlySubView("second-quarter")} style={{ width: "fit-content", padding: "8px 24px", height: "auto" }}>Open</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {quarterlySubView === "first-quarter" && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h2 style={{ margin: 0 }}>First Quarter Report</h2>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <button className="admin-primary-btn" type="button" onClick={() => downloadExcel(1)}>Download Excel</button>
+                  <button className="admin-primary-btn" type="button" onClick={() => handleDownloadPdf(1)}>Download PDF</button>
+                  <button className="admin-primary-btn" type="button" onClick={() => handlePrint(1)}>Print</button>
+                  <button className="admin-secondary-btn" type="button" onClick={() => setQuarterlySubView("attendance")}>Back</button>
+                </div>
+              </div>
+              {renderQuarterTable(1)}
+            </div>
+          )}
+
+          {quarterlySubView === "second-quarter" && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h2 style={{ margin: 0 }}>Second Quarter Report</h2>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <button className="admin-primary-btn" type="button" onClick={() => downloadExcel(2)}>Download Excel</button>
+                  <button className="admin-primary-btn" type="button" onClick={() => handleDownloadPdf(2)}>Download PDF</button>
+                  <button className="admin-primary-btn" type="button" onClick={() => handlePrint(2)}>Print</button>
+                  <button className="admin-secondary-btn" type="button" onClick={() => setQuarterlySubView("attendance")}>Back</button>
+                </div>
+              </div>
+              {renderQuarterTable(2)}
+            </div>
+          )}
+
+          {quarterlySubView === "proforma" && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                <h2 style={{ margin: 0 }}>Proforma for Quarterly Report</h2>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <button className="admin-primary-btn" type="button" onClick={downloadProformaExcel}>Download Excel</button>
+                  <button className="admin-primary-btn" type="button" onClick={handleProformaPrint}>Print</button>
+                  <button className="admin-secondary-btn" type="button" onClick={() => setQuarterlySubView("menu")}>Back</button>
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", padding: "24px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)", color: "#000", fontFamily: "Arial, sans-serif", fontSize: "11px" }}>
+                <div style={{ textAlign: "center", fontWeight: "bold", fontSize: "13px", marginBottom: "10px", textDecoration: "underline" }}>
+                  PROFORMA FOR QUARTERLY REPORT IN R/O DRDO PAID INTERNSHIP SCHEME
+                </div>
+                <div style={{ textAlign: "right", fontSize: "10px", marginBottom: "10px" }}>
+                  To be maintained at DG Cluster / Lab Level
+                </div>
+
+                <div style={{ marginBottom: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <h3 style={{ margin: 0, fontSize: "11px" }}>Quarterly report for quarter ending:</h3>
+                  <input
+                    type="text"
+                    value={proformaQuarterEnding}
+                    onChange={(e) => setProformaQuarterEnding(e.target.value)}
+                    placeholder="e.g. 30 Sept 2026"
+                    style={{ border: "1px dashed #ccc", padding: "2px 4px", fontSize: "11px" }}
+                  />
+                </div>
+
+                <h3 style={{ margin: "10px 0 5px 0", fontSize: "11px" }}>1. BRIEF OF REPORT:</h3>
+                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#f2f2f2" }}>
+                      <th colSpan="5" style={{ border: "1px solid #000" }}></th>
+                      <th style={{ border: "1px solid #000", padding: "3px 4px", fontWeight: "bold", textAlign: "center" }}>DG Cluster</th>
+                      <th colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", fontWeight: "bold", textAlign: "center" }}>Lab / Estt</th>
+                      <th colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", fontWeight: "bold", textAlign: "center" }}>Remark</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>A</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Authorization of Intern:</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>Total students = {proformaStudents.length}</td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>IRDE</td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}></td>
+                    </tr>
+                    <tr>
+                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>B</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        Held Strength of Intern / candidate:<br />
+                        (i) Engaged in Projects<br />
+                        (ii) Engaged in other R&D activity
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}></td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.B_lab}
+                          onChange={(e) => updateSection1("B_lab", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.B_remark}
+                          onChange={(e) => updateSection1("B_remark", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>C</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        Vacant Intern / Candidate:<br />
+                        (i) Under selection and likely to be engaged in Project / R&D activity<br />
+                        (ii) Not under selection
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}></td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.C_lab}
+                          onChange={(e) => updateSection1("C_lab", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.C_remark}
+                          onChange={(e) => updateSection1("C_remark", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>D</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Internship awarded in the reporting period:</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}></td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.D_lab}
+                          onChange={(e) => updateSection1("D_lab", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.D_remark}
+                          onChange={(e) => updateSection1("D_remark", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>E</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Intern / candidate resigned / terminated in the reporting period:</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}></td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.E_lab}
+                          onChange={(e) => updateSection1("E_lab", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.E_remark}
+                          onChange={(e) => updateSection1("E_remark", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>F</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Details of achievement:</td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}></td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.F_lab}
+                          onChange={(e) => updateSection1("F_lab", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                        <input
+                          type="text"
+                          value={proformaSection1.F_remark}
+                          onChange={(e) => updateSection1("F_remark", e.target.value)}
+                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <h3 style={{ margin: "20px 0 5px 0", fontSize: "11px" }}>2. DETAILS IN R/O EACH INTERN:</h3>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ backgroundColor: "#f2f2f2" }}>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>S.No</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name of Intern</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Discipline</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Gender</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of Birth</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of joining the Lab</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name of Project</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Title of assignment</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name of the Supervisor</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name & PDC of the Project in which working</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Achievements</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of Completion of internship</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of Resignation, if applicable</th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Remarks</th>
+                      </tr>
+                      <tr style={{ textAlign: "center", backgroundColor: "#fafafa" }}>
+                        <td style={{ border: "1px solid #000" }}></td>
+                        <td style={{ border: "1px solid #000" }}>(1)</td>
+                        <td style={{ border: "1px solid #000" }}>(2)</td>
+                        <td style={{ border: "1px solid #000" }}>(3)</td>
+                        <td style={{ border: "1px solid #000" }}>(4)</td>
+                        <td style={{ border: "1px solid #000" }}>(5)</td>
+                        <td style={{ border: "1px solid #000" }}>(6)</td>
+                        <td style={{ border: "1px solid #000" }}>(7)</td>
+                        <td style={{ border: "1px solid #000" }}>(8)</td>
+                        <td style={{ border: "1px solid #000" }}>(9)</td>
+                        <td style={{ border: "1px solid #000" }}>(10)</td>
+                        <td style={{ border: "1px solid #000" }}>(11)</td>
+                        <td style={{ border: "1px solid #000" }}>(12)</td>
+                        <td style={{ border: "1px solid #000" }}>(13)</td>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {proformaStudents.length > 0 ? (
+                        proformaStudents.map((s, idx) => (
+                          <tr key={s._id}>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>{idx + 1}</td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.name} onChange={(e) => updateStudentRow(idx, "name", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.discipline} onChange={(e) => updateStudentRow(idx, "discipline", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.gender} onChange={(e) => updateStudentRow(idx, "gender", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.dob} onChange={(e) => updateStudentRow(idx, "dob", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.joiningDate} onChange={(e) => updateStudentRow(idx, "joiningDate", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.projectName} onChange={(e) => updateStudentRow(idx, "projectName", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.designationTitle} onChange={(e) => updateStudentRow(idx, "designationTitle", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.supervisorName} onChange={(e) => updateStudentRow(idx, "supervisorName", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.projectNameAndPdc} onChange={(e) => updateStudentRow(idx, "projectNameAndPdc", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.achievements} onChange={(e) => updateStudentRow(idx, "achievements", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.completionDate} onChange={(e) => updateStudentRow(idx, "completionDate", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.resignationDate} onChange={(e) => updateStudentRow(idx, "resignationDate", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                              <input type="text" value={s.remarks} onChange={(e) => updateStudentRow(idx, "remarks", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="14" style={{ textAlign: "center", padding: "12px", border: "1px solid #000" }}>No approved Paid student records found.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

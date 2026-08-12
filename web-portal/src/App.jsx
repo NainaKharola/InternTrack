@@ -81,6 +81,7 @@ function App() {
             <Route path="/admin/student-management/new" element={protectedPage(<AdminDashboard />)} />
             <Route path="/admin/student-management/:id" element={protectedPage(<AdminDashboard />)} />
             <Route path="/admin/approved-students" element={protectedPage(<AdminDashboard />)} />
+            <Route path="/admin/quarterly-reports" element={protectedPage(<AdminDashboard />)} />
             <Route path="/admin/management" element={protectedPage(<CollegeManagement />)} />
             <Route path="/admin/colleges" element={protectedPage(<CollegeManagement />)} />
             <Route path="/admin/profile" element={protectedPage(<AdminProfile />)} />

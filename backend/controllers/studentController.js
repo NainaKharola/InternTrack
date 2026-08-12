@@ -450,17 +450,107 @@ async function savePaidInternshipProjectDetails(req, res) {
       return res.status(403).json({ success: false, message: "Project details are available only to approved paid-internship students." });
     }
 
-    // Every field is optional. Accept only this explicit allowlist so this
-    // endpoint cannot be used to edit registration or approval data.
-    const fields = ["projectName", "designationTitle", "supervisorName", "projectNameAndPdc", "achievements"];
-    const details = {};
-    for (const field of fields) details[field] = String(req.body[field] || "").trim();
-    student.paidInternshipProjectDetails = details;
+    // Save project details if provided or preserve existing
+    if (req.body.projectName !== undefined || req.body.designationTitle !== undefined || req.body.supervisorName !== undefined || req.body.projectNameAndPdc !== undefined || req.body.achievements !== undefined) {
+      const fields = ["projectName", "designationTitle", "supervisorName", "projectNameAndPdc", "achievements"];
+      const details = {};
+      for (const field of fields) {
+        if (req.body[field] !== undefined) {
+          details[field] = String(req.body[field] || "").trim();
+        } else {
+          details[field] = student.paidInternshipProjectDetails?.[field] || "";
+        }
+      }
+      student.paidInternshipProjectDetails = details;
+    }
+
+    // Save Bank Details
+    if (req.body.bankDetails) {
+      const { bankName, savingAccountNumber, ifsc } = req.body.bankDetails;
+      if (savingAccountNumber && !/^\d+$/.test(savingAccountNumber)) {
+        return res.status(400).json({ success: false, message: "Saving Account Number must contain digits only." });
+      }
+      if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(ifsc)) {
+        return res.status(400).json({ success: false, message: "Enter a valid 11-digit IFSC code (e.g. SBIN0001234)." });
+      }
+      student.bankDetails = {
+        bankName: String(bankName || "").trim(),
+        savingAccountNumber: String(savingAccountNumber || "").trim(),
+        ifsc: String(ifsc || "").toUpperCase().trim(),
+      };
+    }
+
+    // Save First Quarter Report
+    if (req.body.firstQuarterReport) {
+      const { fromDate, toDate, daysPresent } = req.body.firstQuarterReport;
+      if (fromDate && isNaN(Date.parse(fromDate))) {
+        return res.status(400).json({ success: false, message: "First Quarter Report From Date is invalid." });
+      }
+      if (toDate && isNaN(Date.parse(toDate))) {
+        return res.status(400).json({ success: false, message: "First Quarter Report To Date is invalid." });
+      }
+      if (fromDate && toDate) {
+        const start = new Date(fromDate);
+        const end = new Date(toDate);
+        if (end < start) {
+          return res.status(400).json({ success: false, message: "First Quarter Report To Date cannot be earlier than From Date." });
+        }
+        const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+        if (diffDays > 95) {
+          return res.status(400).json({ success: false, message: "First Quarter Report: Date range must not exceed 95 days." });
+        }
+      }
+      if (daysPresent !== undefined && daysPresent !== "") {
+        const days = Number(daysPresent);
+        if (!Number.isSafeInteger(days) || days < 0) {
+          return res.status(400).json({ success: false, message: "First Quarter Report Days Present must be a non-negative whole number." });
+        }
+      }
+      student.firstQuarterReport = {
+        fromDate: fromDate || "",
+        toDate: toDate || "",
+        daysPresent: daysPresent !== undefined && daysPresent !== "" ? Number(daysPresent) : "",
+      };
+    }
+
+    // Save Second Quarter Report
+    if (req.body.secondQuarterReport) {
+      const { fromDate, toDate, daysPresent } = req.body.secondQuarterReport;
+      if (fromDate && isNaN(Date.parse(fromDate))) {
+        return res.status(400).json({ success: false, message: "Second Quarter Report From Date is invalid." });
+      }
+      if (toDate && isNaN(Date.parse(toDate))) {
+        return res.status(400).json({ success: false, message: "Second Quarter Report To Date is invalid." });
+      }
+      if (fromDate && toDate) {
+        const start = new Date(fromDate);
+        const end = new Date(toDate);
+        if (end < start) {
+          return res.status(400).json({ success: false, message: "Second Quarter Report To Date cannot be earlier than From Date." });
+        }
+        const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+        if (diffDays > 95) {
+          return res.status(400).json({ success: false, message: "Second Quarter Report: Date range must not exceed 95 days." });
+        }
+      }
+      if (daysPresent !== undefined && daysPresent !== "") {
+        const days = Number(daysPresent);
+        if (!Number.isSafeInteger(days) || days < 0) {
+          return res.status(400).json({ success: false, message: "Second Quarter Report Days Present must be a non-negative whole number." });
+        }
+      }
+      student.secondQuarterReport = {
+        fromDate: fromDate || "",
+        toDate: toDate || "",
+        daysPresent: daysPresent !== undefined && daysPresent !== "" ? Number(daysPresent) : "",
+      };
+    }
+
     await student.save();
 
-    return res.status(200).json({ success: true, message: "Project details saved successfully.", student: publicStudent(student) });
+    return res.status(200).json({ success: true, message: "Details saved successfully.", student: publicStudent(student) });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Unable to save project details.", error: error.message });
+    return res.status(500).json({ success: false, message: "Unable to save details.", error: error.message });
   }
 }
 

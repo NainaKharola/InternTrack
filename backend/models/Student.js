@@ -20,6 +20,21 @@ module.exports = createLocalModel("students.json", {
     projectNameAndPdc: "",
     achievements: "",
   },
+  bankDetails: {
+    bankName: "",
+    savingAccountNumber: "",
+    ifsc: "",
+  },
+  firstQuarterReport: {
+    fromDate: "",
+    toDate: "",
+    daysPresent: "",
+  },
+  secondQuarterReport: {
+    fromDate: "",
+    toDate: "",
+    daysPresent: "",
+  },
   resignationStatus: "No",
   resignationDate: null,
 });

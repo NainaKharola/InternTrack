@@ -76,6 +76,15 @@ function StudentDashboard() {
   const [projectDetails, setProjectDetails] = useState(null);
   const [projectDetailsMessage, setProjectDetailsMessage] = useState("");
   const [savingProjectDetails, setSavingProjectDetails] = useState(false);
+  const [bankDetails, setBankDetails] = useState({ bankName: "", savingAccountNumber: "", ifsc: "" });
+  const [firstQuarterReport, setFirstQuarterReport] = useState({ fromDate: "", toDate: "", daysPresent: "" });
+  const [secondQuarterReport, setSecondQuarterReport] = useState({ fromDate: "", toDate: "", daysPresent: "" });
+  const [savingBankDetails, setSavingBankDetails] = useState(false);
+  const [bankDetailsMessage, setBankDetailsMessage] = useState("");
+  const [savingFirstQuarter, setSavingFirstQuarter] = useState(false);
+  const [firstQuarterMessage, setFirstQuarterMessage] = useState("");
+  const [savingSecondQuarter, setSavingSecondQuarter] = useState(false);
+  const [secondQuarterMessage, setSecondQuarterMessage] = useState("");
 
   useEffect(() => {
     if (!credentials) {
@@ -94,6 +103,9 @@ function StudentDashboard() {
           setProjectDetails(response.student.paidInternshipProjectDetails || {
             projectName: "", designationTitle: "", supervisorName: "", projectNameAndPdc: "", achievements: "",
           });
+          setBankDetails(response.student.bankDetails || { bankName: "", savingAccountNumber: "", ifsc: "" });
+          setFirstQuarterReport(response.student.firstQuarterReport || { fromDate: "", toDate: "", daysPresent: "" });
+          setSecondQuarterReport(response.student.secondQuarterReport || { fromDate: "", toDate: "", daysPresent: "" });
         }
       } catch (err) {
         if (!ignore) setError(err.message);
@@ -153,6 +165,112 @@ function StudentDashboard() {
       setProjectDetailsMessage(err.message);
     } finally {
       setSavingProjectDetails(false);
+    }
+  };
+
+  const handleBankDetailsSave = async (event) => {
+    event.preventDefault();
+    setSavingBankDetails(true);
+    setBankDetailsMessage("");
+    if (bankDetails.savingAccountNumber && !/^\d+$/.test(bankDetails.savingAccountNumber)) {
+      setBankDetailsMessage("Saving Account Number must contain digits only.");
+      setSavingBankDetails(false);
+      return;
+    }
+    if (bankDetails.ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(bankDetails.ifsc)) {
+      setBankDetailsMessage("Enter a valid 11-digit IFSC code (e.g. SBIN0001234).");
+      setSavingBankDetails(false);
+      return;
+    }
+    try {
+      const response = await savePaidInternshipProjectDetails(credentials, { bankDetails });
+      setStudent(response.student);
+      setBankDetails(response.student.bankDetails || { bankName: "", savingAccountNumber: "", ifsc: "" });
+      setBankDetailsMessage("Bank details saved successfully.");
+    } catch (err) {
+      setBankDetailsMessage(err.message);
+    } finally {
+      setSavingBankDetails(false);
+    }
+  };
+
+  const handleFirstQuarterSave = async (event) => {
+    event.preventDefault();
+    setSavingFirstQuarter(true);
+    setFirstQuarterMessage("");
+    const { fromDate, toDate, daysPresent } = firstQuarterReport;
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      if (end < start) {
+        setFirstQuarterMessage("To Date cannot be earlier than From Date.");
+        setSavingFirstQuarter(false);
+        return;
+      }
+      const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+      if (diffDays > 95) {
+        setFirstQuarterMessage("First Quarter Report: Date range must not exceed 95 days.");
+        setSavingFirstQuarter(false);
+        return;
+      }
+    }
+    if (daysPresent !== undefined && daysPresent !== "") {
+      const days = Number(daysPresent);
+      if (!Number.isSafeInteger(days) || days < 0) {
+        setFirstQuarterMessage("Days Present must be a non-negative whole number.");
+        setSavingFirstQuarter(false);
+        return;
+      }
+    }
+    try {
+      const response = await savePaidInternshipProjectDetails(credentials, { firstQuarterReport });
+      setStudent(response.student);
+      setFirstQuarterReport(response.student.firstQuarterReport || { fromDate: "", toDate: "", daysPresent: "" });
+      setFirstQuarterMessage("First Quarter Report saved successfully.");
+    } catch (err) {
+      setFirstQuarterMessage(err.message);
+    } finally {
+      setSavingFirstQuarter(false);
+    }
+  };
+
+  const handleSecondQuarterSave = async (event) => {
+    event.preventDefault();
+    setSavingSecondQuarter(true);
+    setSecondQuarterMessage("");
+    const { fromDate, toDate, daysPresent } = secondQuarterReport;
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      if (end < start) {
+        setSecondQuarterMessage("To Date cannot be earlier than From Date.");
+        setSavingSecondQuarter(false);
+        return;
+      }
+      const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+      if (diffDays > 95) {
+        setSecondQuarterMessage("Second Quarter Report: Date range must not exceed 95 days.");
+        setSavingSecondQuarter(false);
+        return;
+      }
+    }
+    if (daysPresent !== undefined && daysPresent !== "") {
+      const days = Number(daysPresent);
+      if (!Number.isSafeInteger(days) || days < 0) {
+        setSecondQuarterMessage("Days Present must be a non-negative whole number.");
+        setSavingSecondQuarter(false);
+        return;
+      }
+    }
+    try {
+      const response = await savePaidInternshipProjectDetails(credentials, { secondQuarterReport });
+      setStudent(response.student);
+      setSecondQuarterReport(response.student.secondQuarterReport || { fromDate: "", toDate: "", daysPresent: "" });
+      setSecondQuarterMessage("Second Quarter Report saved successfully.");
+    } catch (err) {
+      setSecondQuarterMessage(err.message);
+    } finally {
+      setSavingSecondQuarter(false);
     }
   };
 
@@ -287,26 +405,89 @@ function StudentDashboard() {
       </section>
 
       {approved && student.internshipType === "Paid" && projectDetails && (
-        <section className="details-section">
-          <h2>Paid Internship Project Details</h2>
-          <p className="admin-muted">All fields are optional and can be updated later.</p>
-          <form className="training-form" onSubmit={handleProjectDetailsSave}>
-            {[
-              ["projectName", "Name of Project"],
-              ["designationTitle", "Title of Designation"],
-              ["supervisorName", "Name of Supervisor"],
-              ["projectNameAndPdc", "Name & PDC of the Project in which Working"],
-              ["achievements", "Achievements"],
-            ].map(([name, label]) => (
-              <label className="admin-field" key={name}>
-                <span>{label}</span>
-                <input name={name} value={projectDetails[name] || ""} onChange={(event) => setProjectDetails(current => ({ ...current, [name]: event.target.value }))} />
+        <>
+          <section className="details-section">
+            <h2>Paid Internship Project Details</h2>
+            <p className="admin-muted">All fields are optional and can be updated later.</p>
+            <form className="training-form" onSubmit={handleProjectDetailsSave}>
+              {[
+                ["projectName", "Name of Project"],
+                ["designationTitle", "Title of Designation"],
+                ["supervisorName", "Name of Supervisor"],
+                ["projectNameAndPdc", "Name & PDC of the Project in which Working"],
+                ["achievements", "Achievements"],
+              ].map(([name, label]) => (
+                <label className="admin-field" key={name}>
+                  <span>{label}</span>
+                  <input name={name} value={projectDetails[name] || ""} onChange={(event) => setProjectDetails(current => ({ ...current, [name]: event.target.value }))} />
+                </label>
+              ))}
+              <button className="primary-button" type="submit" disabled={savingProjectDetails}>{savingProjectDetails ? "Saving..." : "Save Project Details"}</button>
+            </form>
+            {projectDetailsMessage && <p className={projectDetailsMessage.includes("successfully") ? "admin-muted" : "admin-error"}>{projectDetailsMessage}</p>}
+          </section>
+
+          <section className="details-section">
+            <h2>Bank Details</h2>
+            <p className="admin-muted">All fields are optional and can be updated later.</p>
+            <form className="training-form" onSubmit={handleBankDetailsSave}>
+              <label className="admin-field">
+                <span>Bank Name</span>
+                <input value={bankDetails.bankName || ""} onChange={(event) => setBankDetails(current => ({ ...current, bankName: event.target.value }))} />
               </label>
-            ))}
-            <button className="primary-button" type="submit" disabled={savingProjectDetails}>{savingProjectDetails ? "Saving..." : "Save Project Details"}</button>
-          </form>
-          {projectDetailsMessage && <p className={projectDetailsMessage.includes("successfully") ? "admin-muted" : "admin-error"}>{projectDetailsMessage}</p>}
-        </section>
+              <label className="admin-field">
+                <span>Saving A/c No.</span>
+                <input value={bankDetails.savingAccountNumber || ""} onChange={(event) => setBankDetails(current => ({ ...current, savingAccountNumber: event.target.value }))} />
+              </label>
+              <label className="admin-field">
+                <span>IFSC</span>
+                <input value={bankDetails.ifsc || ""} onChange={(event) => setBankDetails(current => ({ ...current, ifsc: event.target.value }))} />
+              </label>
+              <button className="primary-button" type="submit" disabled={savingBankDetails}>{savingBankDetails ? "Saving..." : "Save Bank Details"}</button>
+            </form>
+            {bankDetailsMessage && <p className={bankDetailsMessage.includes("successfully") ? "admin-muted" : "admin-error"}>{bankDetailsMessage}</p>}
+          </section>
+
+          <section className="details-section">
+            <h2>First Quarter Report</h2>
+            <form className="training-form" onSubmit={handleFirstQuarterSave}>
+              <label className="admin-field">
+                <span>From Date</span>
+                <input type="date" value={firstQuarterReport.fromDate ? firstQuarterReport.fromDate.slice(0, 10) : ""} onChange={(event) => setFirstQuarterReport(current => ({ ...current, fromDate: event.target.value }))} />
+              </label>
+              <label className="admin-field">
+                <span>To Date</span>
+                <input type="date" value={firstQuarterReport.toDate ? firstQuarterReport.toDate.slice(0, 10) : ""} onChange={(event) => setFirstQuarterReport(current => ({ ...current, toDate: event.target.value }))} />
+              </label>
+              <label className="admin-field">
+                <span>No. of Days Present</span>
+                <input type="number" min="0" step="1" value={firstQuarterReport.daysPresent !== undefined ? firstQuarterReport.daysPresent : ""} onChange={(event) => setFirstQuarterReport(current => ({ ...current, daysPresent: event.target.value }))} />
+              </label>
+              <button className="primary-button" type="submit" disabled={savingFirstQuarter}>{savingFirstQuarter ? "Saving..." : "Save First Quarter Report"}</button>
+            </form>
+            {firstQuarterMessage && <p className={firstQuarterMessage.includes("successfully") ? "admin-muted" : "admin-error"}>{firstQuarterMessage}</p>}
+          </section>
+
+          <section className="details-section">
+            <h2>Second Quarter Report</h2>
+            <form className="training-form" onSubmit={handleSecondQuarterSave}>
+              <label className="admin-field">
+                <span>From Date</span>
+                <input type="date" value={secondQuarterReport.fromDate ? secondQuarterReport.fromDate.slice(0, 10) : ""} onChange={(event) => setSecondQuarterReport(current => ({ ...current, fromDate: event.target.value }))} />
+              </label>
+              <label className="admin-field">
+                <span>To Date</span>
+                <input type="date" value={secondQuarterReport.toDate ? secondQuarterReport.toDate.slice(0, 10) : ""} onChange={(event) => setSecondQuarterReport(current => ({ ...current, toDate: event.target.value }))} />
+              </label>
+              <label className="admin-field">
+                <span>No. of Days Present</span>
+                <input type="number" min="0" step="1" value={secondQuarterReport.daysPresent !== undefined ? secondQuarterReport.daysPresent : ""} onChange={(event) => setSecondQuarterReport(current => ({ ...current, daysPresent: event.target.value }))} />
+              </label>
+              <button className="primary-button" type="submit" disabled={savingSecondQuarter}>{savingSecondQuarter ? "Saving..." : "Save Second Quarter Report"}</button>
+            </form>
+            {secondQuarterMessage && <p className={secondQuarterMessage.includes("successfully") ? "admin-muted" : "admin-error"}>{secondQuarterMessage}</p>}
+          </section>
+        </>
       )}
 
       {approved && (

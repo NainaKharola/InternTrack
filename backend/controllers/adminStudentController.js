@@ -180,7 +180,7 @@ async function getStudents(req, res) {
     const filter = buildStudentFilter(req.query);
     const sort = buildSort(req.query.sortBy, req.query.sortOrder);
     const projection =
-      "_id referenceId name gender course collegeName location email phone branch year cgpa submittedAt status recommendedBy trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType completedStatus";
+      "_id referenceId name gender dob course collegeName location email phone branch year cgpa submittedAt status recommendedBy trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType completedStatus bankDetails paidInternshipProjectDetails firstQuarterReport secondQuarterReport";
 
     const [
       students,
@@ -1029,4 +1029,21 @@ module.exports = {
   saveTrainingManagement,
   updateStudentDetails,
   recommendedByOptions,
+  generateReportPdf,
 };
+
+async function generateReportPdf(req, res) {
+  try {
+    const { html } = req.body;
+    if (!html) {
+      return res.status(400).json({ success: false, message: "HTML content is required." });
+    }
+    const { generatePdfFromHtml } = require("../services/pdfService");
+    const pdfBuffer = await generatePdfFromHtml(html);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Attendance-Report.pdf"`);
+    return res.send(pdfBuffer);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Unable to generate PDF.", error: error.message });
+  }
+}

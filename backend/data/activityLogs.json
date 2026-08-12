@@ -4992,5 +4992,27 @@
     "status": "Success",
     "timestamp": "2026-08-12T20:25:55.997Z",
     "_id": "a9fea1cd3e9731140a3eab50"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Training Management",
+    "action": "Updated Dates",
+    "description": "Updated training dates for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-12T22:35:10.643Z",
+    "_id": "216088cc9841c9d65230ddd2"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Training Management",
+    "action": "Updated Training Details",
+    "description": "Updated training details for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-12T22:35:14.717Z",
+    "_id": "cdc5ce342eb565af3e4e1ac9"
   }
 ]

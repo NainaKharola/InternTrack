@@ -30,6 +30,7 @@ const {
   updateStudentReview,
   uploadOfferLetter,
   updateStudentDetails,
+  generateReportPdf,
 } = require("../controllers/adminStudentController");
 const { uploadStudentDocuments } = require("../middleware/uploadMiddleware");
 const { protectAdmin, requireMainAdmin } = require("../middleware/adminAuth");
@@ -107,5 +108,7 @@ router.post(
   uploadOfferLetterFile,
   uploadOfferLetter
 );
+
+router.post("/attendance-report/pdf", protectAdmin, generateReportPdf);
 
 module.exports = router;
