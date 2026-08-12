@@ -32,19 +32,6 @@ function parseDate(value) {
     : null;
 }
 
-function trainingDuration(startDate, endDate) {
-  const start = parseDate(startDate);
-  const end = parseDate(endDate);
-  if (!start || !end || end < start) return "";
-
-  const days = (end - start) / (24 * 60 * 60 * 1000);
-  if (days && days % 7 === 0) {
-    const weeks = days / 7;
-    return `${weeks} Week${weeks === 1 ? "" : "s"}`;
-  }
-  return `${days} Day${days === 1 ? "" : "s"}`;
-}
-
 function studentToRow(student) {
   const training = student.trainingManagement || {};
   return {
@@ -63,34 +50,25 @@ function studentToRow(student) {
 }
 
 function buildStudentRows(rows) {
-    return rows
+  return rows
     .map((row) => {
-      const duration = trainingDuration(
-        row.trainingStartDate,
-        row.trainingEndDate,
-      );
       return `
         <tr>
           <td>
-            <strong>${escapeHtml(row.studentName)}</strong>,
-            ${escapeHtml(row.course)}
-            ${escapeHtml(row.courseYear)},
-            ${escapeHtml(row.branch)}
-            ${row.division ? `<br><small>Division: ${escapeHtml(row.division)}</small>` : ""}
+            <div style="display:flex; gap:16px;">
+              <strong>${escapeHtml(row.studentName)}</strong>
+              <strong>${escapeHtml(row.courseYear)}</strong>
+            </div>
+            <div style="margin-top:8px;">${escapeHtml(row.branch || row.course)}</div>
           </td>
 
           <td>
-            ${escapeHtml(row.collegeName)}
-            ${row.collegeAddress ? `<br><small>${escapeHtml(row.collegeAddress)}</small>` : ""}
+            <div>${escapeHtml(row.collegeName)}</div>
+            <div style="margin-top:4px;">${escapeHtml(row.collegeLocation)}</div>
           </td>
 
           <td>
-            ${escapeHtml(row.collegeLocation)}
-            <br>
-            ${escapeHtml(formatDate(row.trainingStartDate))}
-            &nbsp;&nbsp;&nbsp;&nbsp;
-            ${escapeHtml(formatDate(row.trainingEndDate))}
-            ${duration ? `<br>${escapeHtml(duration)}` : ""}
+            ${escapeHtml(formatDate(row.trainingStartDate))} - ${escapeHtml(formatDate(row.trainingEndDate))}
           </td>
         </tr>
       `;
@@ -100,10 +78,15 @@ function buildStudentRows(rows) {
 
 async function generateGyapanHtml({ rows, letterNumber, issueDate, division }) {
   const template = await fs.readFile(templatePath, "utf8");
+  const dateInIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const yyyy = dateInIST.getFullYear();
+  const mm = String(dateInIST.getMonth() + 1).padStart(2, "0");
+  const dd = String(dateInIST.getDate()).padStart(2, "0");
+  const currentDateStr = `${yyyy}-${mm}-${dd}`;
   return template.replace(/{{(studentRows|letterNumber|issueDate|division)}}/g, (_, key) => {
     if (key === "studentRows") return buildStudentRows(rows);
     if (key === "division") return escapeHtml(division || "");
-    return escapeHtml(key === "issueDate" ? formatDate(issueDate) : letterNumber);
+    return escapeHtml(key === "issueDate" ? formatDate(currentDateStr) : letterNumber);
   });
 }
 

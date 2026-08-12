@@ -149,6 +149,8 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
     designation: existing.designation || "",
     leaveAvailed: existing.leaveAvailed || "",
     completed: existing.completed || student.completedStatus || "",
+    resignationStatus: student.resignationStatus || "No",
+    resignationDate: student.resignationDate ? String(student.resignationDate).slice(0, 10) : "",
   });
   const [open, setOpen] = useState(alwaysOpen);
   const [message, setMessage] = useState("");
@@ -169,23 +171,36 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
       const branch = form.branch;
       divisions.forEach((div) => {
         const config = administration.divisionConfigurations?.[div];
-        const totalVacancy = (config?.allowedBranches || []).reduce((sum, b) => {
-          const seats = config?.branchSeats?.[b];
-          return sum + Math.max(0, Number(seats) || 0);
-        }, 0);
+        const isPaidStudent = (student.internshipType || "Unpaid").toLowerCase() === "paid";
+        const paidVacancy = (config?.allowedBranches || []).reduce((sum, b) => sum + Math.max(0, Number(config?.branchSeats?.[b]?.paid) || 0), 0);
+        const unpaidVacancy = (config?.allowedBranches || []).reduce((sum, b) => sum + Math.max(0, Number(config?.branchSeats?.[b]?.unpaid ?? config?.branchSeats?.[b]) || 0), 0);
+        const totalVacancy = paidVacancy + unpaidVacancy;
+        
         const activeStudents = students.filter(s =>
           s.status === "Approved" &&
           s.trainingManagement?.division === div &&
           s.trainingManagement?.completed !== "Yes" &&
+          (s.internshipType || "Unpaid").toLowerCase() === (student.internshipType || "Unpaid").toLowerCase() &&
           s._id !== student._id
         );
-        const branchCapacity = Math.max(0, Number(config?.branchSeats?.[branch]) || 0);
+        
+        const branchSeatObj = config?.branchSeats?.[branch];
+        let branchCapacity = 0;
+        if (branchSeatObj && typeof branchSeatObj === "object") {
+          branchCapacity = isPaidStudent ? (Number(branchSeatObj.paid) || 0) : (Number(branchSeatObj.unpaid) || 0);
+        } else {
+          branchCapacity = isPaidStudent ? 0 : (Number(branchSeatObj) || 0);
+        }
+        
         const allocatedForBranch = activeStudents.filter((assignedStudent) => assignedStudent.branch === branch).length;
-        const availableSeats = Math.max(0, totalVacancy - activeStudents.length);
+        const typeCapacity = isPaidStudent
+          ? Math.max(0, Number(config?.paidSeats ?? paidVacancy) || 0)
+          : Math.max(0, Number(config?.unpaidSeats ?? unpaidVacancy) || 0);
+        const availableSeats = Math.max(0, typeCapacity - activeStudents.length);
         const branchAvailableSeats = Math.max(0, branchCapacity - allocatedForBranch);
         const acceptsBranch = Boolean(branch && config?.allowedBranches?.includes(branch) && branchCapacity > 0);
         stats[div] = {
-          isFull: totalVacancy > 0 && availableSeats === 0,
+          isFull: typeCapacity > 0 && availableSeats === 0,
           isBranchFull: !acceptsBranch || branchAvailableSeats === 0,
           availableSeats,
           branchAvailableSeats,
@@ -218,6 +233,7 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
           name === "trainingDuration" ? value : current.trainingDuration
         );
       }
+      if (name === "resignationStatus" && value === "No") next.resignationDate = "";
       return next;
     });
     setMessage("");
@@ -263,6 +279,10 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
         setMessage("🔴 Please complete all Student Joining Details before marking Completion Status as Yes.");
         return;
       }
+    }
+    if (student.internshipType === "Paid" && payload.resignationStatus === "Yes" && !payload.resignationDate) {
+      setMessage("Please enter a resignation date when resignation is Yes.");
+      return;
     }
 
     setSaving(true);
@@ -529,6 +549,22 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
             </label>
           ))}
 
+          {student.internshipType === "Paid" && (
+            <label className="admin-field">
+              <span>Resignation</span>
+              <select name="resignationStatus" value={form.resignationStatus} onChange={handleChange}>
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </label>
+          )}
+          {student.internshipType === "Paid" && form.resignationStatus === "Yes" && (
+            <label className="admin-field">
+              <span>Resignation Date</span>
+              <input type="date" name="resignationDate" value={form.resignationDate} onChange={handleChange} required />
+            </label>
+          )}
+
           <p className={message.startsWith("Unable") || message.startsWith("No ") || message.startsWith("Select ") || message.startsWith("🔴") || message.startsWith("Please") ? "admin-error" : "admin-muted"} role="status" style={message.startsWith("🔴") || message.startsWith("Please") ? { color: "red", fontWeight: "bold" } : {}}>{saving ? "Saving..." : message || (dirty ? "Changes pending..." : "Saved")}</p>
         </form>
       )}
@@ -557,7 +593,7 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
   const isFormDirty = () => {
     if (!isEditing) return false;
     const fields = [
-      "name", "phone", "email", "aadhaarNumber", "dob",
+      "name", "gender", "phone", "email", "aadhaarNumber", "dob",
       "collegeName", "collegeAddress", "collegeLocation", "collegeState",
       "course", "branch", "year", "cgpa", "collegeId",
       "currentAddress", "permanentAddress", "fatherName", "fatherPhone", "fatherOccupation",
@@ -638,6 +674,7 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
   const handleStartEdit = () => {
     setEditForm({
       name: student.name || "",
+      gender: student.gender || "",
       phone: student.phone || "",
       email: student.email || "",
       aadhaarNumber: student.aadhaarNumber || "",
@@ -911,6 +948,15 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
               />
             </label>
             <label className="admin-field">
+              <span>Gender</span>
+              <select value={editForm.gender} onChange={(e) => handleEditChange("gender", e.target.value)}>
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label className="admin-field">
               <span>Phone Number</span>
               <input
                 value={editForm.phone}
@@ -938,6 +984,7 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
           title="Personal Details"
           rows={[
             ["Name", student.name],
+            ["Gender", student.gender],
             ["Date of Birth", student.dob],
             ["Phone Number", student.phone],
             ["Email", student.email],

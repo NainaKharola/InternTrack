@@ -7,12 +7,21 @@ const nonNegativeNumber = (value) => Math.max(0, Number(value) || 0);
 
 export function getBranchSeatCapacity(configuration, branch) {
   const configuredSeats = configuration?.branchSeats?.[branch];
+  if (configuredSeats && typeof configuredSeats === "object") {
+    return nonNegativeNumber(configuredSeats.paid) + nonNegativeNumber(configuredSeats.unpaid);
+  }
   if (Number.isFinite(Number(configuredSeats))) return nonNegativeNumber(configuredSeats);
   return configuration?.allowedBranches?.includes(branch) ? nonNegativeNumber(configuration.totalVacancy) : 0;
 }
 
 export function calculateTotalVacancy(configuration) {
-  return (configuration?.allowedBranches || []).reduce((sum, branch) => sum + getBranchSeatCapacity(configuration, branch), 0);
+  return (configuration?.allowedBranches || []).reduce((sum, branch) => {
+    const seats = configuration?.branchSeats?.[branch];
+    if (seats && typeof seats === "object") {
+      return sum + nonNegativeNumber(seats.paid) + nonNegativeNumber(seats.unpaid);
+    }
+    return sum + getBranchSeatCapacity(configuration, branch);
+  }, 0);
 }
 
 export function calculateAvailableSeats(configuredSeats, allocatedStudents) {

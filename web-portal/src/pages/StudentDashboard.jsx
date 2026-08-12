@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   fetchStudentDashboard,
+  savePaidInternshipProjectDetails,
   studentDocumentUrl,
   uploadCompletedDocuments,
 } from "../services/studentService";
@@ -72,6 +73,9 @@ function StudentDashboard() {
   const [error, setError] = useState("");
   const [completedFile, setCompletedFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
+  const [projectDetails, setProjectDetails] = useState(null);
+  const [projectDetailsMessage, setProjectDetailsMessage] = useState("");
+  const [savingProjectDetails, setSavingProjectDetails] = useState(false);
 
   useEffect(() => {
     if (!credentials) {
@@ -85,7 +89,12 @@ function StudentDashboard() {
     async function loadDashboard() {
       try {
         const response = await fetchStudentDashboard(credentials);
-        if (!ignore) setStudent(response.student);
+        if (!ignore) {
+          setStudent(response.student);
+          setProjectDetails(response.student.paidInternshipProjectDetails || {
+            projectName: "", designationTitle: "", supervisorName: "", projectNameAndPdc: "", achievements: "",
+          });
+        }
       } catch (err) {
         if (!ignore) setError(err.message);
       } finally {
@@ -128,6 +137,22 @@ function StudentDashboard() {
       setUploadMessage(response.message);
     } catch (err) {
       setUploadMessage(err.message);
+    }
+  };
+
+  const handleProjectDetailsSave = async (event) => {
+    event.preventDefault();
+    setSavingProjectDetails(true);
+    setProjectDetailsMessage("");
+    try {
+      const response = await savePaidInternshipProjectDetails(credentials, projectDetails);
+      setStudent(response.student);
+      setProjectDetails(response.student.paidInternshipProjectDetails);
+      setProjectDetailsMessage(response.message);
+    } catch (err) {
+      setProjectDetailsMessage(err.message);
+    } finally {
+      setSavingProjectDetails(false);
     }
   };
 
@@ -183,6 +208,7 @@ function StudentDashboard() {
           ["Name", student.name],
           ["Email", student.email],
           ["Phone Number", student.phone],
+          ["Gender", student.gender],
           ["Date of Birth", student.dob],
           ["Registration Status", student.status],
         ]}
@@ -259,6 +285,29 @@ function StudentDashboard() {
           </p>
         )}
       </section>
+
+      {approved && student.internshipType === "Paid" && projectDetails && (
+        <section className="details-section">
+          <h2>Paid Internship Project Details</h2>
+          <p className="admin-muted">All fields are optional and can be updated later.</p>
+          <form className="training-form" onSubmit={handleProjectDetailsSave}>
+            {[
+              ["projectName", "Name of Project"],
+              ["designationTitle", "Title of Designation"],
+              ["supervisorName", "Name of Supervisor"],
+              ["projectNameAndPdc", "Name & PDC of the Project in which Working"],
+              ["achievements", "Achievements"],
+            ].map(([name, label]) => (
+              <label className="admin-field" key={name}>
+                <span>{label}</span>
+                <input name={name} value={projectDetails[name] || ""} onChange={(event) => setProjectDetails(current => ({ ...current, [name]: event.target.value }))} />
+              </label>
+            ))}
+            <button className="primary-button" type="submit" disabled={savingProjectDetails}>{savingProjectDetails ? "Saving..." : "Save Project Details"}</button>
+          </form>
+          {projectDetailsMessage && <p className={projectDetailsMessage.includes("successfully") ? "admin-muted" : "admin-error"}>{projectDetailsMessage}</p>}
+        </section>
+      )}
 
       {approved && (
         <section className="details-section">

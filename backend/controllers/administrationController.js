@@ -17,7 +17,7 @@ async function addDivision(req, res, next) {
     const administration = await getAdministration();
     if (isDuplicate(administration.divisions, name)) return respondError(res, "A division with this name already exists.");
     administration.divisions.push(name);
-    administration.divisionConfigurations[name] = { allowedBranches: [], totalVacancy: 0, branchSeats: {} };
+    administration.divisionConfigurations[name] = { allowedBranches: [], paidSeats: 0, unpaidSeats: 0, totalVacancy: 0, branchSeats: {} };
     await saveAdministration(administration);
 
     await logActivity({
@@ -51,7 +51,7 @@ async function updateDivision(req, res, next) {
     if (index < 0) return res.status(404).json({ success: false, message: "Division not found." });
     if (isDuplicate(administration.divisions, name, previousName)) return respondError(res, "A division with this name already exists.");
     administration.divisions[index] = name;
-    administration.divisionConfigurations[name] = administration.divisionConfigurations[previousName] || { allowedBranches: [], totalVacancy: 0, branchSeats: {} };
+    administration.divisionConfigurations[name] = administration.divisionConfigurations[previousName] || { allowedBranches: [], paidSeats: 0, unpaidSeats: 0, totalVacancy: 0, branchSeats: {} };
     delete administration.divisionConfigurations[previousName];
     await saveAdministration(administration);
     res.json({ success: true, message: "Division updated successfully.", administration });
@@ -91,19 +91,28 @@ async function deleteDivision(req, res, next) {
 
 async function updateSeats(req, res, next) {
   try {
-    const totalAllocatedSeats = Number(req.body.totalAllocatedSeats);
-    if (!Number.isSafeInteger(totalAllocatedSeats) || totalAllocatedSeats <= 0) return respondError(res, "Enter a positive whole number for total allocated seats.");
+    const paidSeatLimit = Number(req.body.paidSeatLimit);
+    const unpaidSeatLimit = Number(req.body.unpaidSeatLimit);
+    if (!Number.isSafeInteger(paidSeatLimit) || paidSeatLimit < 0 || !Number.isSafeInteger(unpaidSeatLimit) || unpaidSeatLimit < 0) return respondError(res, "Enter whole numbers of 0 or more for Paid and Unpaid seats.");
+    const totalAllocatedSeats = paidSeatLimit + unpaidSeatLimit;
+    if (totalAllocatedSeats <= 0) return respondError(res, "At least one overall seat limit must be greater than zero.");
     const administration = await getAdministration();
     const configuredVacancies = totalVacancies(administration.divisionConfigurations);
     if (configuredVacancies > totalAllocatedSeats) return respondError(res, `Total division vacancies (${configuredVacancies}) cannot exceed total allocated seats (${totalAllocatedSeats}). Reduce division vacancies first.`);
+    const configuredPaid = Object.values(administration.divisionConfigurations).reduce((sum, entry) => sum + Number(entry?.paidSeats || 0), 0);
+    const configuredUnpaid = Object.values(administration.divisionConfigurations).reduce((sum, entry) => sum + Number(entry?.unpaidSeats || 0), 0);
+    if (configuredPaid > paidSeatLimit || configuredUnpaid > unpaidSeatLimit) return respondError(res, "Division Paid or Unpaid capacity cannot exceed its corresponding overall seat limit.");
     administration.totalAllocatedSeats = totalAllocatedSeats;
+    administration.paidSeatLimit = paidSeatLimit;
+    administration.unpaidSeatLimit = unpaidSeatLimit;
+    administration.totalSeatLimit = totalAllocatedSeats;
     await saveAdministration(administration);
 
     await logActivity({
       req,
       module: "Administration",
       action: "Updated Vacancy",
-      description: `Updated total allocated seats to ${totalAllocatedSeats}.`,
+      description: `Updated overall seats: Paid ${paidSeatLimit}, Unpaid ${unpaidSeatLimit}, Total ${totalAllocatedSeats}.`,
       status: "Success",
     });
 
@@ -135,19 +144,37 @@ async function saveDivisionConfigurations(req, res, next) {
     const configurations = {};
     for (const division of administration.divisions) {
       const entry = requested[division] || {};
+      const existing = administration.divisionConfigurations[division] || {};
       const allowedBranches = Array.isArray(entry.allowedBranches) ? [...new Set(entry.allowedBranches.map((branch) => String(branch).trim()).filter(Boolean))] : [];
-      let totalVacancy = 0;
+      let paidSeats = 0;
+      let unpaidSeats = 0;
       const branchSeats = {};
       for (const branch of allowedBranches) {
-        const seats = Number(entry.branchSeats?.[branch] ?? 0);
-        if (!Number.isSafeInteger(seats) || seats < 0) return respondError(res, `Enter a whole number of 0 or more for ${branch} in ${division}.`);
-        branchSeats[branch] = seats;
-        totalVacancy += seats;
+        const val = entry.branchSeats?.[branch];
+        let paid = 0;
+        let unpaid = 0;
+        if (val && typeof val === "object") {
+          paid = Number(val.paid ?? 0);
+          unpaid = Number(val.unpaid ?? 0);
+        } else {
+          unpaid = Number(val ?? 0);
+        }
+        if (!Number.isSafeInteger(paid) || paid < 0 || !Number.isSafeInteger(unpaid) || unpaid < 0) {
+          return respondError(res, `Enter whole numbers of 0 or more for ${branch} in ${division}.`);
+        }
+        branchSeats[branch] = { paid, unpaid };
+        paidSeats += paid;
+        unpaidSeats += unpaid;
       }
-      configurations[division] = { allowedBranches, totalVacancy, branchSeats };
+      configurations[division] = { allowedBranches, paidSeats, unpaidSeats, totalVacancy: paidSeats + unpaidSeats, branchSeats };
     }
     const configuredVacancies = totalVacancies(configurations);
     if (configuredVacancies > administration.totalAllocatedSeats) return respondError(res, `Total division vacancies (${configuredVacancies}) cannot exceed the configured total allocated seats (${administration.totalAllocatedSeats}). Reduce division vacancies before saving.`);
+    if (administration.paidSeatLimit !== undefined && administration.unpaidSeatLimit !== undefined) {
+      const configuredPaid = Object.values(configurations).reduce((sum, entry) => sum + Number(entry.paidSeats || 0), 0);
+      const configuredUnpaid = Object.values(configurations).reduce((sum, entry) => sum + Number(entry.unpaidSeats || 0), 0);
+      if (configuredPaid > administration.paidSeatLimit || configuredUnpaid > administration.unpaidSeatLimit) return respondError(res, "Division Paid or Unpaid capacity cannot exceed its corresponding overall seat limit.");
+    }
     administration.divisionConfigurations = configurations;
     await saveAdministration(administration);
 

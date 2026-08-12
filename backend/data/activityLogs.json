@@ -4772,5 +4772,203 @@
     "status": "Success",
     "timestamp": "2026-08-09T21:38:10.546Z",
     "_id": "cdf870eefdef62cc700f598d"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'SS & ST'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T18:31:37.704Z",
+    "_id": "740cc5e0421c2898855959f2"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Training Management",
+    "action": "Updated Training Details",
+    "description": "Updated training details for Rihana.",
+    "status": "Success",
+    "timestamp": "2026-08-12T18:59:22.604Z",
+    "_id": "728b672556e7afa586bf8db0"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'SS & ST'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:11:11.826Z",
+    "_id": "5381b048008556e945a5b4b0"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Training Management",
+    "action": "Updated Training Details",
+    "description": "Updated training details for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:13:55.750Z",
+    "_id": "057cdd688141b1d9a5cb7f15"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Training Management",
+    "action": "Updated Training Details",
+    "description": "Updated training details for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:13:58.947Z",
+    "_id": "36aa9fb25b2fe66e49be4f11"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Training Management",
+    "action": "Updated Training Details",
+    "description": "Updated training details for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:14:24.046Z",
+    "_id": "7bd2e8fb8f8b544977140c70"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Training Management",
+    "action": "Updated Training Details",
+    "description": "Updated training details for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:14:24.808Z",
+    "_id": "7af778fb18d8f1f5da24a587"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Training Management",
+    "action": "Updated Training Details",
+    "description": "Updated training details for Krishna.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:14:57.076Z",
+    "_id": "7edfc625b41c34df30ceb2a4"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'HR'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:25:47.717Z",
+    "_id": "9619a0031244c7033638418a"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'HR'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:26:12.369Z",
+    "_id": "2fa88e313e5a638ded6d2ea7"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'VI'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:26:20.608Z",
+    "_id": "676d9fe36d5e1ab5c7fdf9aa"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Administration",
+    "action": "Updated Vacancy",
+    "description": "Updated overall seats: Paid 50, Unpaid 150, Total 200.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:28:26.134Z",
+    "_id": "4c75ff968fb16b295583940a"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'SS & ST'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:47:14.542Z",
+    "_id": "1ae62f574dd912625aaa9c76"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'HR'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T19:47:30.101Z",
+    "_id": "3ef002897efff89d2c3ac6fc"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'VI'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T20:02:11.229Z",
+    "_id": "90a2bbd3705e71c18c6ac33d"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'HR'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T20:02:29.742Z",
+    "_id": "25742d652f3ad5119c9069f8"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'SS & ST'.",
+    "status": "Success",
+    "timestamp": "2026-08-12T20:02:29.959Z",
+    "_id": "933d5ebc4328c86ad9cd9f41"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Administration",
+    "action": "Updated Branch Configuration",
+    "description": "Updated division vacancy and allowed branch configurations.",
+    "status": "Success",
+    "timestamp": "2026-08-12T20:03:41.864Z",
+    "_id": "82e1182f4ff40609d17dc647"
   }
 ]

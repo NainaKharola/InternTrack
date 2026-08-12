@@ -11,6 +11,7 @@ const {
 
 const requiredFields = [
   "name",
+  "gender",
   "course",
   "branch",
   "currentYear",
@@ -114,6 +115,10 @@ function validateRequest(body, files) {
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
     return "Enter a valid email address.";
+  }
+
+  if (!['Male', 'Female', 'Other'].includes(body.gender)) {
+    return "Select a valid gender.";
   }
 
   if (new Date(body.dob) > new Date()) {
@@ -247,6 +252,7 @@ async function createStudent(req, res) {
       serialNumber,
       internshipType: req.body.internshipType || "Unpaid",
       name: req.body.name,
+      gender: req.body.gender,
       course: req.body.course,
       branch: req.body.branch,
       year: req.body.currentYear,
@@ -433,6 +439,31 @@ async function getStudentDashboard(req, res) {
   }
 }
 
+async function savePaidInternshipProjectDetails(req, res) {
+  try {
+    const student = await findStudentForPortal(req.body.email, req.body.referenceId);
+
+    if (!student) {
+      return res.status(401).json({ success: false, message: "Email address and Reference ID do not match any registration." });
+    }
+    if (student.status !== "Approved" || student.internshipType !== "Paid") {
+      return res.status(403).json({ success: false, message: "Project details are available only to approved paid-internship students." });
+    }
+
+    // Every field is optional. Accept only this explicit allowlist so this
+    // endpoint cannot be used to edit registration or approval data.
+    const fields = ["projectName", "designationTitle", "supervisorName", "projectNameAndPdc", "achievements"];
+    const details = {};
+    for (const field of fields) details[field] = String(req.body[field] || "").trim();
+    student.paidInternshipProjectDetails = details;
+    await student.save();
+
+    return res.status(200).json({ success: true, message: "Project details saved successfully.", student: publicStudent(student) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Unable to save project details.", error: error.message });
+  }
+}
+
 async function downloadStudentDocument(req, res) {
   try {
     const student = await findStudentForPortal(req.query.email, req.query.referenceId);
@@ -538,5 +569,6 @@ module.exports = {
   downloadStudentDocument,
   getStudentDashboard,
   loginStudent,
+  savePaidInternshipProjectDetails,
   uploadCompletedStudentDocuments,
 };

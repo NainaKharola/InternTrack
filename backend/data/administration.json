@@ -1,5 +1,5 @@
 {
-  "totalAllocatedSeats": 150,
+  "totalAllocatedSeats": 200,
   "divisions": [
     "ABS",
     "AI",
@@ -46,12 +46,26 @@
         "Aerospace Engineering",
         "Artificial Intelligence and Data Science"
       ],
-      "totalVacancy": 19,
+      "paidSeats": 6,
+      "unpaidSeats": 19,
+      "totalVacancy": 25,
       "branchSeats": {
-        "Electronics and Communication": 3,
-        "Electrical Engineering": 8,
-        "Aerospace Engineering": 5,
-        "Artificial Intelligence and Data Science": 3
+        "Electronics and Communication": {
+          "paid": 2,
+          "unpaid": 3
+        },
+        "Electrical Engineering": {
+          "paid": 1,
+          "unpaid": 8
+        },
+        "Aerospace Engineering": {
+          "paid": 2,
+          "unpaid": 5
+        },
+        "Artificial Intelligence and Data Science": {
+          "paid": 1,
+          "unpaid": 3
+        }
       }
     },
     "AI": {
@@ -59,19 +73,32 @@
         "Computer Science and Engineering",
         "Information Technology"
       ],
-      "totalVacancy": 11,
+      "paidSeats": 2,
+      "unpaidSeats": 11,
+      "totalVacancy": 13,
       "branchSeats": {
-        "Computer Science and Engineering": 10,
-        "Information Technology": 1
+        "Computer Science and Engineering": {
+          "paid": 1,
+          "unpaid": 10
+        },
+        "Information Technology": {
+          "paid": 1,
+          "unpaid": 1
+        }
       }
     },
     "ALTDS": {
       "allowedBranches": [
         "Information Technology"
       ],
-      "totalVacancy": 2,
+      "paidSeats": 1,
+      "unpaidSeats": 2,
+      "totalVacancy": 3,
       "branchSeats": {
-        "Information Technology": 2
+        "Information Technology": {
+          "paid": 1,
+          "unpaid": 2
+        }
       }
     },
     "AV": {
@@ -80,50 +107,77 @@
         "Electrical Engineering",
         "Electronics and Communication"
       ],
-      "totalVacancy": 11,
+      "paidSeats": 3,
+      "unpaidSeats": 11,
+      "totalVacancy": 14,
       "branchSeats": {
-        "Mechanical Engineering": 5,
-        "Electrical Engineering": 2,
-        "Electronics and Communication": 4
+        "Mechanical Engineering": {
+          "paid": 1,
+          "unpaid": 5
+        },
+        "Electrical Engineering": {
+          "paid": 1,
+          "unpaid": 2
+        },
+        "Electronics and Communication": {
+          "paid": 1,
+          "unpaid": 4
+        }
       }
     },
     "CMD": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "CS & S": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "DIR": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "EAD": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "ENV": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "EOTS & ITF": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "FACET": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "FTIR": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
@@ -135,13 +189,30 @@
         "Civil Engineering",
         "Artificial Intelligence and Data Science"
       ],
-      "totalVacancy": 19,
+      "paidSeats": 5,
+      "unpaidSeats": 19,
+      "totalVacancy": 24,
       "branchSeats": {
-        "Computer Science and Engineering": 2,
-        "Electrical Engineering": 6,
-        "Electronics and Communication": 6,
-        "Civil Engineering": 1,
-        "Artificial Intelligence and Data Science": 4
+        "Computer Science and Engineering": {
+          "paid": 1,
+          "unpaid": 2
+        },
+        "Electrical Engineering": {
+          "paid": 1,
+          "unpaid": 6
+        },
+        "Electronics and Communication": {
+          "paid": 1,
+          "unpaid": 6
+        },
+        "Civil Engineering": {
+          "paid": 1,
+          "unpaid": 1
+        },
+        "Artificial Intelligence and Data Science": {
+          "paid": 1,
+          "unpaid": 4
+        }
       }
     },
     "HRD": {
@@ -150,100 +221,147 @@
         "Electronics and Communication",
         "Information Technology"
       ],
-      "totalVacancy": 21,
+      "paidSeats": 3,
+      "unpaidSeats": 21,
+      "totalVacancy": 24,
       "branchSeats": {
-        "Computer Science and Engineering": 10,
-        "Electronics and Communication": 10,
-        "Information Technology": 1
+        "Computer Science and Engineering": {
+          "paid": 1,
+          "unpaid": 10
+        },
+        "Electronics and Communication": {
+          "paid": 1,
+          "unpaid": 10
+        },
+        "Information Technology": {
+          "paid": 1,
+          "unpaid": 1
+        }
       }
     },
     "IRST": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "ISO": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "LI": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "LIC": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "LIDAR": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "LPF": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "LS": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "MI": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "MS": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "MT": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "NS (Naval System)": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "OD (Optical Design)": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "OME": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "P & C": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "Photonics": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "Reprography": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "SECURITY": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
     "Servo System": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
@@ -251,13 +369,20 @@
       "allowedBranches": [
         "Electronics and Communication"
       ],
-      "totalVacancy": 5,
+      "paidSeats": 1,
+      "unpaidSeats": 5,
+      "totalVacancy": 6,
       "branchSeats": {
-        "Electronics and Communication": 5
+        "Electronics and Communication": {
+          "paid": 1,
+          "unpaid": 5
+        }
       }
     },
     "TFDI": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     },
@@ -266,16 +391,29 @@
         "Information Technology",
         "Computer Science and Engineering"
       ],
-      "totalVacancy": 6,
+      "paidSeats": 2,
+      "unpaidSeats": 6,
+      "totalVacancy": 8,
       "branchSeats": {
-        "Information Technology": 1,
-        "Computer Science and Engineering": 5
+        "Information Technology": {
+          "paid": 1,
+          "unpaid": 1
+        },
+        "Computer Science and Engineering": {
+          "paid": 1,
+          "unpaid": 5
+        }
       }
     },
     "WORKS": {
       "allowedBranches": [],
+      "paidSeats": 0,
+      "unpaidSeats": 0,
       "totalVacancy": 0,
       "branchSeats": {}
     }
-  }
+  },
+  "paidSeatLimit": 50,
+  "unpaidSeatLimit": 150,
+  "totalSeatLimit": 200
 }

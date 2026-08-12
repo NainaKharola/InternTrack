@@ -15,7 +15,8 @@ import "../styles/admin.css";
 function Administration() {
   const [administration, setAdministration] = useState(null);
   const [divisionName, setDivisionName] = useState("");
-  const [seatCount, setSeatCount] = useState("");
+  const [paidSeatLimit, setPaidSeatLimit] = useState("");
+  const [unpaidSeatLimit, setUnpaidSeatLimit] = useState("");
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [message, setMessage] = useState("");
@@ -47,7 +48,8 @@ function Administration() {
 
   const applyAdministration = useCallback((next, successMessage = "") => {
     setAdministration(next);
-    setSeatCount(String(next.totalAllocatedSeats));
+    setPaidSeatLimit(next.paidSeatLimit === undefined ? "" : String(next.paidSeatLimit));
+    setUnpaidSeatLimit(next.unpaidSeatLimit === undefined ? "" : String(next.unpaidSeatLimit));
     setError("");
     setMessage(successMessage);
     window.dispatchEvent(new CustomEvent("administration-updated", { detail: next }));
@@ -114,7 +116,7 @@ function Administration() {
 
   const handleSeatUpdate = async (event) => {
     event.preventDefault();
-    await runAction(() => updateTotalAllocatedSeats(seatCount), "Seat allocation updated successfully.");
+    await runAction(() => updateTotalAllocatedSeats(paidSeatLimit, unpaidSeatLimit), "Seat allocation updated successfully.");
   };
 
   const toggleDivisions = async () => {
@@ -206,10 +208,12 @@ function Administration() {
           <section className="administration-card administration-card--seats">
             <div className="administration-card__heading">
               <span className="administration-icon" aria-hidden="true">◫</span>
-              <div><h2>Division-wise Seat Allocation</h2><p>Set the total capacity for future division-level allocation.</p></div>
+              <div><h2>Overall Seat Limit</h2><p>Set the portal-wide maximum. Configure separate Paid and Unpaid seats for each division below.</p></div>
             </div>
             <form className="seat-allocation-form" onSubmit={handleSeatUpdate}>
-              <label className="admin-field"><span>Total Allocated Seats</span><input type="number" min="1" step="1" inputMode="numeric" value={seatCount} onChange={(event) => setSeatCount(event.target.value)} required /></label>
+              <label className="admin-field"><span>Paid Seats</span><input type="number" min="0" step="1" inputMode="numeric" value={paidSeatLimit} onChange={(event) => setPaidSeatLimit(event.target.value)} required /></label>
+              <label className="admin-field"><span>Unpaid Seats</span><input type="number" min="0" step="1" inputMode="numeric" value={unpaidSeatLimit} onChange={(event) => setUnpaidSeatLimit(event.target.value)} required /></label>
+              <label className="admin-field"><span>Total Seats</span><input type="number" readOnly value={(Number(paidSeatLimit) || 0) + (Number(unpaidSeatLimit) || 0)} /></label>
               <button className="admin-primary-btn" disabled={saving} type="submit">Update</button>
             </form>
             <div className="future-ready-note"><span aria-hidden="true">✦</span><div><strong>Future-ready configuration</strong><p>Individual division seat limits can be added here without changing the saved configuration structure.</p></div></div>

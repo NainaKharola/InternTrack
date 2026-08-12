@@ -5,6 +5,7 @@ const {
   downloadStudentDocument,
   getStudentDashboard,
   loginStudent,
+  savePaidInternshipProjectDetails,
   uploadCompletedStudentDocuments,
 } = require("../controllers/studentController");
 const {
@@ -18,6 +19,7 @@ const router = express.Router();
 router.post("/", uploadStudentDocuments, createStudent);
 router.post("/login", loginStudent);
 router.get("/dashboard", getStudentDashboard);
+router.patch("/paid-project-details", savePaidInternshipProjectDetails);
 router.get("/documents/:type", downloadStudentDocument);
 router.post(
   "/completed-documents",

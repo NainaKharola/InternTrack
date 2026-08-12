@@ -6,6 +6,16 @@ function PersonalForm({ form, errors, onChange }) {
       <h2>Personal Details</h2>
       <div className="form-grid">
         <TextInput label="Name" name="name" value={form.name} onChange={onChange} error={errors.name} required />
+        <label className={`field ${errors.gender ? "field--error" : ""}`}>
+          <select className="field__control" name="gender" value={form.gender} onChange={onChange} aria-invalid={Boolean(errors.gender)} required>
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+          <span className="field__label">Gender</span>
+          {errors.gender && <span className="field__error">{errors.gender}</span>}
+        </label>
         <TextInput
           label="Phone Number"
           name="phone"

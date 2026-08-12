@@ -43,7 +43,7 @@ function Landing({ isPaid = false }) {
             </h1>
             {isPaid && (
               <p style={{ fontSize: "28px", fontWeight: "700", color: "var(--primary)", marginTop: "12px", textAlign: "left" }}>
-                (Under Paid Internship Program)
+                Under Paid Internship Program
               </p>
             )}
           </div>

@@ -11,6 +11,7 @@ import "../../styles/form.css";
 
 const initialForm = {
   name: "",
+  gender: "",
   course: "",
   branch: "",
   currentYear: "",
@@ -69,6 +70,7 @@ function validateStepOne(form) {
   const errors = {};
   const requiredFields = [
     "name",
+    "gender",
     "course",
     "branch",
     "currentYear",

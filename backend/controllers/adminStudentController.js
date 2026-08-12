@@ -540,6 +540,7 @@ async function saveTrainingManagement(req, res) {
         studentId: student._id,
         division,
         branch: req.body.branch || student.branch,
+        internshipType: student.internshipType,
       });
       if (capacityError) return res.status(400).json({ success: false, message: capacityError });
     }
@@ -561,6 +562,19 @@ async function saveTrainingManagement(req, res) {
           success: false,
           message: "Please complete all Student Joining Details before marking Completion Status as Yes.",
         });
+      }
+    }
+
+    const isPaidInternship = student.internshipType === "Paid";
+    const resignationStatus = isPaidInternship && req.body.resignationStatus === "Yes" ? "Yes" : "No";
+    const resignationDateValue = String(req.body.resignationDate || "").trim();
+    if (isPaidInternship && resignationStatus === "Yes") {
+      const parsedDate = new Date(`${resignationDateValue}T12:00:00`);
+      const validDate = /^\d{4}-\d{2}-\d{2}$/.test(resignationDateValue) &&
+        !Number.isNaN(parsedDate.getTime()) &&
+        parsedDate.toISOString().slice(0, 10) === resignationDateValue;
+      if (!validDate) {
+        return res.status(400).json({ success: false, message: "Resignation date is required when resignation is Yes." });
       }
     }
 
@@ -632,6 +646,10 @@ async function saveTrainingManagement(req, res) {
     student.joinedDate = training.joinedDate || undefined;
     student.completedStatus = training.completed;
     student.completedDate = training.completionDate || undefined;
+    if (isPaidInternship) {
+      student.resignationStatus = resignationStatus;
+      student.resignationDate = resignationStatus === "Yes" ? new Date(`${resignationDateValue}T12:00:00`) : null;
+    }
 
     await student.save();
 
@@ -794,6 +812,7 @@ async function updateStudentDetails(req, res) {
           studentId: student._id,
           division: currentDivision,
           branch: nextBranch,
+          internshipType: student.internshipType,
         });
       } else {
         capacityError = "No division assigned.";
@@ -808,6 +827,7 @@ async function updateStudentDetails(req, res) {
             studentId: student._id,
             division: div,
             branch: nextBranch,
+            internshipType: student.internshipType,
           });
           if (!divError) {
             foundDivision = div;
@@ -873,6 +893,7 @@ async function updateStudentDetails(req, res) {
 
     // Update text fields
     if (body.name !== undefined) student.name = body.name;
+    if (body.gender !== undefined) student.gender = body.gender;
     if (body.phone !== undefined) student.phone = body.phone;
     if (body.email !== undefined) student.email = body.email.trim().toLowerCase();
     if (body.aadhaarNumber !== undefined) student.aadhaarNumber = body.aadhaarNumber;

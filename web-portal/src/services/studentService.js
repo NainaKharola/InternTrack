@@ -77,3 +77,13 @@ export async function uploadCompletedDocuments(credentials, file) {
 
   return parseResponse(response);
 }
+
+export async function savePaidInternshipProjectDetails(credentials, details) {
+  const response = await fetch(`${API_URL}/students/paid-project-details`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...credentials, ...details }),
+  });
+
+  return parseResponse(response);
+}

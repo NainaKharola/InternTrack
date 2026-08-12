@@ -233,11 +233,11 @@ export async function removeDivision(name) {
   return parseResponse(response);
 }
 
-export async function updateTotalAllocatedSeats(totalAllocatedSeats) {
+export async function updateTotalAllocatedSeats(paidSeatLimit, unpaidSeatLimit) {
   const response = await fetch(`${API_URL}/administration/seats`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ totalAllocatedSeats }),
+    body: JSON.stringify({ paidSeatLimit, unpaidSeatLimit }),
   });
   return parseResponse(response);
 }

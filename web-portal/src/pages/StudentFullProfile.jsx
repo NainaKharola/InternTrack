@@ -110,6 +110,7 @@ function StudentFullProfile() {
           ["Name", student.name],
           ["Email", student.email],
           ["Phone Number", student.phone],
+          ["Gender", student.gender],
           ["Aadhaar Number", student.aadhaarNumber],
           ["Date of Birth", student.dob],
         ]}
