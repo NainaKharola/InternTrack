@@ -874,39 +874,37 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
         </div>
         {!inSplitView && (
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            {!isApprovedView && (
-              isEditing ? (
-                <>
-                  <button
-                    className="admin-primary-btn"
-                    disabled={editSaving}
-                    type="button"
-                    onClick={handleSaveDetails}
-                    style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
-                  >
-                    {editSaving ? "Saving..." : "Save Changes"}
-                  </button>
-                  <button
-                    className="admin-secondary-btn"
-                    type="button"
-                    onClick={() => setIsEditing(false)}
-                    style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    className="admin-primary-btn"
-                    type="button"
-                    onClick={handleStartEdit}
-                    style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
-                  >
-                    Edit
-                  </button>
-                </>
-              )
+            {isEditing ? (
+              <>
+                <button
+                  className="admin-primary-btn"
+                  disabled={editSaving}
+                  type="button"
+                  onClick={handleSaveDetails}
+                  style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
+                >
+                  {editSaving ? "Saving..." : "Save Changes"}
+                </button>
+                <button
+                  className="admin-secondary-btn"
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="admin-primary-btn"
+                  type="button"
+                  onClick={handleStartEdit}
+                  style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
+                >
+                  Edit
+                </button>
+              </>
             )}
             <button
               className="admin-secondary-btn"
@@ -928,7 +926,7 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
         </div>
       )}
 
-      {!isApprovedView && (isEditing ? (
+      {isEditing ? (
         <section className="details-section">
           <h2>Personal Details</h2>
           <div className="details-grid">
@@ -984,14 +982,14 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
           title="Personal Details"
           rows={[
             ["Name", student.name],
-            ["Gender", student.gender],
+            ["Gender", student.gender || "Not Provided"],
             ["Date of Birth", student.dob],
             ["Phone Number", student.phone],
             ["Email", student.email],
             ["Aadhaar Number", student.aadhaarNumber || "-"],
           ]}
         />
-      ))}
+      )}
 
       {!isApprovedView && (isEditing ? (
         <section className="details-section">

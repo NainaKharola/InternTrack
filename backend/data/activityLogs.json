@@ -4970,5 +4970,27 @@
     "status": "Success",
     "timestamp": "2026-08-12T20:03:41.864Z",
     "_id": "82e1182f4ff40609d17dc647"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Student Module",
+    "action": "Edited Student Details",
+    "description": "Edited student details for Ram.",
+    "status": "Success",
+    "timestamp": "2026-08-12T20:13:20.251Z",
+    "_id": "c813c518823975c568401a56"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Student Module",
+    "action": "Edited Student Details",
+    "description": "Edited student details for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-12T20:25:55.997Z",
+    "_id": "a9fea1cd3e9731140a3eab50"
   }
 ]

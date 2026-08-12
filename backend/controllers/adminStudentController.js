@@ -180,7 +180,7 @@ async function getStudents(req, res) {
     const filter = buildStudentFilter(req.query);
     const sort = buildSort(req.query.sortBy, req.query.sortOrder);
     const projection =
-      "_id referenceId name course collegeName location email phone branch year cgpa submittedAt status recommendedBy trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType completedStatus";
+      "_id referenceId name gender course collegeName location email phone branch year cgpa submittedAt status recommendedBy trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType completedStatus";
 
     const [
       students,
@@ -848,6 +848,14 @@ async function updateStudentDetails(req, res) {
     }
 
     // Validate using the existing validation rules before saving.
+    if (body.name !== undefined && !body.name.trim()) {
+      return res.status(400).json({ success: false, message: "Name cannot be empty." });
+    }
+
+    if (body.gender !== undefined && body.gender && !["Male", "Female", "Other"].includes(body.gender)) {
+      return res.status(400).json({ success: false, message: "Select a valid gender." });
+    }
+
     if (body.phone && !/^\d{10}$/.test(body.phone)) {
       return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits." });
     }
