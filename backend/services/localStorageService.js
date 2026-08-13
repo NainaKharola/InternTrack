@@ -26,6 +26,7 @@ function matchesCondition(value, condition) {
   return String(value) === String(condition);
 }
 
+
 function matches(record, filter = {}) {
   return Object.entries(filter).every(([key, condition]) => {
     if (key === "$or") return condition.some((entry) => matches(record, entry));
