@@ -153,7 +153,7 @@ function AdminDashboard() {
         const saved = sessionStorage.getItem("approved_filters");
         if (saved) return JSON.parse(saved);
       } catch (e) {}
-      return { ...initialFilters, status: "Approved", internshipType: "" };
+      return { ...initialFilters, status: "", internshipType: "" };
     }
     return initialFilters;
   });
@@ -265,6 +265,7 @@ function AdminDashboard() {
       search,
       ...filters,
       ...sort,
+      isApprovedView: window.location.pathname.startsWith("/admin/approved-students") ? "true" : undefined
     }),
     [filters, search, sort]
   );

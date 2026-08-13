@@ -12,7 +12,7 @@ export default function StudentDivisionRecommendation({ student, students: propS
         return comp !== "yes";
       });
       if (student) {
-        setRecommendations(getBranchDivisionRecommendations(propAdministration.divisions, propAdministration.divisionConfigurations, activeStudents, student.branch));
+        setRecommendations(getBranchDivisionRecommendations(propAdministration.divisions, propAdministration.divisionConfigurations, activeStudents, student.branch, student));
       } else {
         setRecommendations(getGeneralDivisionRecommendations(propAdministration.divisions, propAdministration.divisionConfigurations, activeStudents));
       }
@@ -26,7 +26,7 @@ export default function StudentDivisionRecommendation({ student, students: propS
         return comp !== "yes";
       });
       if (student) {
-        setRecommendations(getBranchDivisionRecommendations(administration.divisions, administration.divisionConfigurations, activeStudents, student.branch));
+        setRecommendations(getBranchDivisionRecommendations(administration.divisions, administration.divisionConfigurations, activeStudents, student.branch, student));
       } else {
         setRecommendations(getGeneralDivisionRecommendations(administration.divisions, administration.divisionConfigurations, activeStudents));
       }

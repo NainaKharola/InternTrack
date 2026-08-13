@@ -193,9 +193,7 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
         }
         
         const allocatedForBranch = activeStudents.filter((assignedStudent) => assignedStudent.branch === branch).length;
-        const typeCapacity = isPaidStudent
-          ? Math.max(0, Number(config?.paidSeats ?? paidVacancy) || 0)
-          : Math.max(0, Number(config?.unpaidSeats ?? unpaidVacancy) || 0);
+        const typeCapacity = isPaidStudent ? paidVacancy : unpaidVacancy;
         const availableSeats = Math.max(0, typeCapacity - activeStudents.length);
         const branchAvailableSeats = Math.max(0, branchCapacity - allocatedForBranch);
         const acceptsBranch = Boolean(branch && config?.allowedBranches?.includes(branch) && branchCapacity > 0);
@@ -874,38 +872,6 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
         </div>
         {!inSplitView && (
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            {isEditing ? (
-              <>
-                <button
-                  className="admin-primary-btn"
-                  disabled={editSaving}
-                  type="button"
-                  onClick={handleSaveDetails}
-                  style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
-                >
-                  {editSaving ? "Saving..." : "Save Changes"}
-                </button>
-                <button
-                  className="admin-secondary-btn"
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  className="admin-primary-btn"
-                  type="button"
-                  onClick={handleStartEdit}
-                  style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
-                >
-                  Edit
-                </button>
-              </>
-            )}
             <button
               className="admin-secondary-btn"
               type="button"

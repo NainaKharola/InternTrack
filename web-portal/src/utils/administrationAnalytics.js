@@ -45,14 +45,38 @@ export function getAllocatedStudentCount(students, division, divisions) {
   return getAllocatedStudents(students, divisions).filter((student) => student.trainingManagement?.division === division).length;
 }
 
-export function getBranchDivisionRecommendations(divisions, configurations, students, branch) {
+export function getBranchDivisionRecommendations(divisions, configurations, students, branch, student) {
+  const normalizedType = student?.internshipType === "Paid" ? "Paid" : "Unpaid";
+  const typeKey = normalizedType.toLowerCase();
+
   const rows = divisions.map((division) => {
-    const configuredSeats = getBranchSeatCapacity(configurations?.[division], branch);
-    const allocatedStudents = getAllocatedStudents(students, divisions).filter((student) => (
-      student.trainingManagement?.division === division && student.branch === branch
+    const config = configurations?.[division];
+    const seats = config?.branchSeats?.[branch];
+    let configuredSeats = 0;
+    if (seats && typeof seats === "object") {
+      configuredSeats = nonNegativeNumber(seats[typeKey]);
+    } else {
+      configuredSeats = normalizedType === "Unpaid" ? nonNegativeNumber(seats) : 0;
+    }
+
+    const allocatedStudents = getAllocatedStudents(students, divisions).filter((s) => (
+      s.trainingManagement?.division === division && s.branch === branch && (s.internshipType || "Unpaid") === normalizedType
     )).length;
-    const divisionCapacity = calculateTotalVacancy(configurations?.[division]);
-    const divisionAllocated = getAllocatedStudentCount(students, division, divisions);
+
+    let divisionCapacity = 0;
+    (config?.allowedBranches || []).forEach((b) => {
+      const bs = config?.branchSeats?.[b];
+      if (bs && typeof bs === "object") {
+        divisionCapacity += nonNegativeNumber(bs[typeKey]);
+      } else {
+        divisionCapacity += normalizedType === "Unpaid" ? nonNegativeNumber(bs) : 0;
+      }
+    });
+
+    const divisionAllocated = getAllocatedStudents(students, divisions).filter((s) => (
+      s.trainingManagement?.division === division && (s.internshipType || "Unpaid") === normalizedType
+    )).length;
+
     const availableSeats = Math.min(
       calculateAvailableSeats(configuredSeats, allocatedStudents),
       calculateAvailableSeats(divisionCapacity, divisionAllocated),

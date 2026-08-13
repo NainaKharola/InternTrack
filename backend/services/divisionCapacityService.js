@@ -39,8 +39,7 @@ async function validateDivisionCapacity({ Student, studentId, division, branch, 
   const configuration = administration.divisionConfigurations[division];
   const normalizedType = internshipType === "Paid" ? "Paid" : "Unpaid";
   const typeKey = normalizedType.toLowerCase();
-  const branchSeats = seatCount(configuration?.branchSeats?.[branch]?.[typeKey] ?? configuration?.branchSeats?.[branch]);
-  const totalVacancy = calculateTotalVacancy(configuration);
+  const branchSeats = seatCount(configuration?.branchSeats?.[branch]?.[typeKey] ?? (normalizedType === "Unpaid" ? configuration?.branchSeats?.[branch] : 0));
   if (!configuration?.allowedBranches?.includes(branch) || branchSeats === 0) return `No seats are configured for ${branch} in ${division}.`;
 
   const assigned = await Student.find({
@@ -49,10 +48,19 @@ async function validateDivisionCapacity({ Student, studentId, division, branch, 
     completedStatus: { $ne: "Yes" },
   }).lean();
   const otherStudents = assigned.filter((assignedStudent) => String(assignedStudent._id) !== String(studentId));
-  const hasSeparateTypeCapacity = Number.isSafeInteger(configuration?.paidSeats) && Number.isSafeInteger(configuration?.unpaidSeats);
-  if (!hasSeparateTypeCapacity) {
-    if (calculateAvailableSeats(totalVacancy, otherStudents.length) === 0) return `${division} has no available seats. The student cannot be assigned to this division.`;
-  }
+
+  let paidCapacity = 0;
+  let unpaidCapacity = 0;
+  (configuration?.allowedBranches || []).forEach((b) => {
+    const seats = configuration?.branchSeats?.[b];
+    if (seats && typeof seats === "object") {
+      paidCapacity += seatCount(seats.paid);
+      unpaidCapacity += seatCount(seats.unpaid);
+    } else {
+      unpaidCapacity += seatCount(seats);
+    }
+  });
+
   const overallLimit = normalizedType === "Paid" ? administration.paidSeatLimit : administration.unpaidSeatLimit;
   if (Number.isSafeInteger(overallLimit)) {
     const allAssigned = await Student.find({ status: "Approved", completedStatus: { $ne: "Yes" } }).lean();
@@ -63,13 +71,14 @@ async function validateDivisionCapacity({ Student, studentId, division, branch, 
     )).length;
     if (calculateAvailableSeats(overallLimit, allocatedOverallForType) === 0) return `No available overall ${normalizedType.toLowerCase()} internship seats. The student cannot be assigned.`;
   }
-  const typeCapacity = normalizedType === "Paid"
-    ? seatCount(configuration?.paidSeats)
-    : seatCount(configuration?.unpaidSeats ?? totalVacancy);
+
+  const typeCapacity = normalizedType === "Paid" ? paidCapacity : unpaidCapacity;
   const allocatedForType = otherStudents.filter((assignedStudent) => (assignedStudent.internshipType || "Unpaid") === normalizedType).length;
-  if (hasSeparateTypeCapacity && calculateAvailableSeats(typeCapacity, allocatedForType) === 0) return `${division} has no available ${normalizedType.toLowerCase()} internship seats. The student cannot be assigned to this division.`;
+  if (calculateAvailableSeats(typeCapacity, allocatedForType) === 0) return `${division} has no available ${normalizedType.toLowerCase()} internship seats. The student cannot be assigned to this division.`;
+
   const allocatedForBranch = otherStudents.filter((assignedStudent) => assignedStudent.branch === branch && (assignedStudent.internshipType || "Unpaid") === normalizedType).length;
   if (calculateAvailableSeats(branchSeats, allocatedForBranch) === 0) return `No available seat for ${branch} in ${division}. Please assign the student to another division.`;
+
   return "";
 }
 

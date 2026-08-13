@@ -92,12 +92,29 @@ function buildStudentFilter(query) {
   if (query.branch) filter.branch = query.branch;
   if (query.year) filter.year = query.year;
 
-  if (query.status === "Pending") {
-    conditions.push({
-      $or: [{ status: "Pending" }, { status: { $exists: false } }],
-    });
-  } else if (query.status) {
-    filter.status = query.status;
+  const isApprovedView = query.isApprovedView === "true";
+
+  if (isApprovedView) {
+    filter.status = "Approved";
+    if (query.status === "Completed") {
+      filter.completedStatus = "Yes";
+    } else if (query.status === "Not Completed") {
+      filter.completedStatus = { $ne: "Yes" };
+    }
+  } else {
+    if (query.status === "Pending") {
+      conditions.push({
+        $or: [{ status: "Pending" }, { status: { $exists: false } }],
+      });
+    } else if (query.status === "Approved") {
+      filter.status = "Approved";
+    } else if (query.status === "Completed") {
+      filter.completedStatus = "Yes";
+    } else if (query.status === "Not Completed") {
+      filter.completedStatus = { $ne: "Yes" };
+    } else if (query.status) {
+      filter.status = query.status;
+    }
   }
 
   if (conditions.length) filter.$and = conditions;

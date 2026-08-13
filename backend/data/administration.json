@@ -46,12 +46,12 @@
         "Aerospace Engineering",
         "Artificial Intelligence and Data Science"
       ],
-      "paidSeats": 6,
+      "paidSeats": 4,
       "unpaidSeats": 19,
-      "totalVacancy": 25,
+      "totalVacancy": 23,
       "branchSeats": {
         "Electronics and Communication": {
-          "paid": 2,
+          "paid": 1,
           "unpaid": 3
         },
         "Electrical Engineering": {
@@ -59,7 +59,7 @@
           "unpaid": 8
         },
         "Aerospace Engineering": {
-          "paid": 2,
+          "paid": 1,
           "unpaid": 5
         },
         "Artificial Intelligence and Data Science": {
@@ -103,18 +103,13 @@
     },
     "AV": {
       "allowedBranches": [
-        "Mechanical Engineering",
         "Electrical Engineering",
         "Electronics and Communication"
       ],
-      "paidSeats": 3,
-      "unpaidSeats": 11,
-      "totalVacancy": 14,
+      "paidSeats": 2,
+      "unpaidSeats": 6,
+      "totalVacancy": 8,
       "branchSeats": {
-        "Mechanical Engineering": {
-          "paid": 1,
-          "unpaid": 5
-        },
         "Electrical Engineering": {
           "paid": 1,
           "unpaid": 2

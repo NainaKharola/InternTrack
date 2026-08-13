@@ -66,10 +66,9 @@ function FilterBar({ filters, onChange, students }) {
           value={filters.status}
           onChange={(event) => updateFilter("status", event.target.value)}
         >
-          <option value="">All Status</option>
-          <option value="Pending">Pending</option>
-          <option value="Approved">Approved</option>
-          <option value="Rejected">Rejected</option>
+          <option value="">All Students</option>
+          <option value="Completed">Completed</option>
+          <option value="Not Completed">Not Completed</option>
         </select>
       </label>
 

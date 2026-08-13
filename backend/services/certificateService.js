@@ -235,8 +235,8 @@ function generateCertificateHtml(student, renderMode = "full", signatureName = "
 
         /* Clean Rectangle Banner without side triangle wings */
         .banner {
-            background-color: #0b2240;
-            color: #ffffff;
+            background-color: #e0ebf5;
+            color: #0b2240;
             text-align: center;
             padding: 8px 10px;
             border-top: 2px solid #b89753;
@@ -458,52 +458,58 @@ function generateCertificateHtml(student, renderMode = "full", signatureName = "
                     <span class="value">${escapeHtml(toDate)}</span>
                 </div>
 
+                ${renderMode === "template" ? "" : `
                 <div style="margin-bottom: 5px;">
                     <span class="label">5. Brief Details of Training (Nature of Training / Project Taken up, if any):</span>
                 </div>
-
-                <div class="box-container">
-                    <div class="details-box">${detailsHtml}</div>
-                </div>
-
-                <div class="performance-section">
-                    <div style="margin-bottom: 10px;">
-                        <span class="label">6. Overall Performance of Student during Training:</span>
-                    </div>
-                    <div class="options-grid">
-                        <div class="option-item">
-                            <span>Outstanding</span>
-                            <span class="checkbox-custom">${checkOutstanding}</span>
-                        </div>
-                        <div class="option-item">
-                            <span>Very Good</span>
-                            <span class="checkbox-custom">${checkVeryGood}</span>
-                        </div>
-                        <div class="option-item">
-                            <span>Good</span>
-                            <span class="checkbox-custom">${checkGood}</span>
-                        </div>
-                        <div class="option-item">
-                            <span>Average</span>
-                            <span class="checkbox-custom">${checkAverage}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Footer Section -->
-            <div class="footer-section">
-                <div class="dated-row">
-                    <span>Dated</span>
-                    <span class="colon">:</span>
-                    <span class="date-val">${escapeHtml(issuedDate)}</span>
-                </div>
-                <div class="signature-block">
-                    <div class="signature-line"></div>
-                    <div class="name">(${escapeHtml(signatureName.toUpperCase())})</div>
-                    <div class="title">${escapeHtml(signatureDesignation.toUpperCase())}</div>
-                    <div class="sub-title">for Director</div>
-                </div>
+                `}
+ 
+                 <div class="box-container">
+                     <div class="details-box">${detailsHtml}</div>
+                 </div>
+ 
+                ${renderMode === "template" ? "" : `
+                 <div class="performance-section">
+                     <div style="margin-bottom: 10px;">
+                         <span class="label">6. Overall Performance of Student during Training:</span>
+                     </div>
+                     <div class="options-grid">
+                         <div class="option-item">
+                             <span>Outstanding</span>
+                             <span class="checkbox-custom">${checkOutstanding}</span>
+                         </div>
+                         <div class="option-item">
+                             <span>Very Good</span>
+                             <span class="checkbox-custom">${checkVeryGood}</span>
+                         </div>
+                         <div class="option-item">
+                             <span>Good</span>
+                             <span class="checkbox-custom">${checkGood}</span>
+                         </div>
+                         <div class="option-item">
+                             <span>Average</span>
+                             <span class="checkbox-custom">${checkAverage}</span>
+                         </div>
+                     </div>
+                 </div>
+                `}
+             </div>
+ 
+             <!-- Footer Section -->
+             <div class="footer-section">
+                 <div class="dated-row">
+                     <span>Dated</span>
+                     <span class="colon">:</span>
+                     <span class="date-val">${escapeHtml(issuedDate)}</span>
+                 </div>
+                ${renderMode === "template" ? "" : `
+                 <div class="signature-block">
+                     <div class="signature-line"></div>
+                     <div class="name">(${escapeHtml(signatureName.toUpperCase())})</div>
+                     <div class="title">${escapeHtml(signatureDesignation.toUpperCase())}</div>
+                     <div class="sub-title">for Director</div>
+                 </div>
+                `}
             </div>
 
             <div class="system-generated">
