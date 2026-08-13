@@ -201,17 +201,35 @@ async function saveDivisionConfigurations(req, res, next) {
 
 async function saveProformaConfig(req, res, next) {
   try {
-    const { proformaQuarterEnding, proformaSection1 } = req.body;
+    const { proformaQuarterEnding, proformaSection1, reportPeriod, proformaSelectedPeriod, attendanceSelectedPeriod } = req.body;
     const administration = await getAdministration();
 
-    if (proformaQuarterEnding !== undefined) {
-      administration.proformaQuarterEnding = proformaQuarterEnding;
+    if (proformaSelectedPeriod !== undefined) {
+      administration.proformaSelectedPeriod = proformaSelectedPeriod;
     }
-    if (proformaSection1 !== undefined) {
-      administration.proformaSection1 = {
-        ...administration.proformaSection1,
-        ...proformaSection1
+    if (attendanceSelectedPeriod !== undefined) {
+      administration.attendanceSelectedPeriod = attendanceSelectedPeriod;
+    }
+
+    if (reportPeriod) {
+      administration.proformas ||= {};
+      administration.proformas[reportPeriod] = {
+        proformaQuarterEnding,
+        proformaSection1
       };
+      // Keep legacy fields in sync for compatibility
+      if (proformaQuarterEnding !== undefined) administration.proformaQuarterEnding = proformaQuarterEnding;
+      if (proformaSection1 !== undefined) administration.proformaSection1 = proformaSection1;
+    } else {
+      if (proformaQuarterEnding !== undefined) {
+        administration.proformaQuarterEnding = proformaQuarterEnding;
+      }
+      if (proformaSection1 !== undefined) {
+        administration.proformaSection1 = {
+          ...administration.proformaSection1,
+          ...proformaSection1
+        };
+      }
     }
 
     await saveAdministration(administration);

@@ -62,6 +62,18 @@ function buildStudentFilter(query) {
   const filter = {};
   const conditions = [];
 
+  if (query.isQuarterlyReport === "true") {
+    filter.status = "Approved";
+    filter.internshipType = "Paid";
+    if (query.fromDate && query.toDate) {
+      filter["trainingManagement.fromDate"] = {
+        $gte: query.fromDate,
+        $lte: query.toDate,
+      };
+    }
+    return filter;
+  }
+
   if (query.internshipType) {
     if (query.internshipType === "Unpaid") {
       conditions.push({

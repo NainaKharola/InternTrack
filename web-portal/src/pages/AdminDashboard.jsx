@@ -122,6 +122,7 @@ function AdminDashboard() {
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [proformaQuarterEnding, setProformaQuarterEnding] = useState("");
   const [proformaSection1, setProformaSection1] = useState({
+    B_dg_cluster: "", C_dg_cluster: "", D_dg_cluster: "", E_dg_cluster: "", F_dg_cluster: "",
     B_lab: "", B_remark: "",
     C_lab: "", C_remark: "",
     D_lab: "", D_remark: "",
@@ -129,7 +130,13 @@ function AdminDashboard() {
     F_lab: "", F_remark: ""
   });
   const [proformaStudents, setProformaStudents] = useState([]);
+  const [proformaFromDate, setProformaFromDate] = useState("");
+  const [proformaToDate, setProformaToDate] = useState("");
+  const [proformaGenerated, setProformaGenerated] = useState(false);
 
+  const [attendanceFromDate, setAttendanceFromDate] = useState("");
+  const [attendanceToDate, setAttendanceToDate] = useState("");
+  const [attendanceGenerated, setAttendanceGenerated] = useState(false);
 
   // Recovery Setup States
   const [showRecoverySetup, setShowRecoverySetup] = useState(false);
@@ -156,7 +163,7 @@ function AdminDashboard() {
       try {
         const saved = sessionStorage.getItem("approved_filters");
         if (saved) return JSON.parse(saved);
-      } catch (e) {}
+      } catch (e) { }
       return { ...initialFilters, status: "", internshipType: "" };
     }
     return initialFilters;
@@ -167,7 +174,7 @@ function AdminDashboard() {
       try {
         const saved = sessionStorage.getItem("approved_sort");
         if (saved) return JSON.parse(saved);
-      } catch (e) {}
+      } catch (e) { }
     }
     return { sortBy: "submittedAt", sortOrder: "desc" };
   });
@@ -191,11 +198,19 @@ function AdminDashboard() {
   }, [sort]);
 
   useEffect(() => {
-    if (quarterlySubView === "proforma" && allStudents.length > 0) {
+    if (quarterlySubView === "proforma") {
       const approvedPaid = allStudents.filter(
         (s) => s.status === "Approved" && s.internshipType === "Paid"
       );
-      const mapped = approvedPaid.map((student) => {
+      const filtered = approvedPaid.filter((s) => {
+        const joining = s.trainingManagement?.fromDate || "";
+        if (proformaFromDate && proformaToDate) {
+          const isInSelectedRange = joining >= proformaFromDate && joining <= proformaToDate;
+          return isInSelectedRange;
+        }
+        return true;
+      });
+      const mapped = filtered.map((student) => {
         const project = student.paidInternshipProjectDetails || {};
         const training = student.trainingManagement || {};
         const discipline = `${student.course || ""} - ${student.branch || ""}`;
@@ -222,7 +237,7 @@ function AdminDashboard() {
       });
       setProformaStudents(mapped);
     }
-  }, [quarterlySubView, allStudents]);
+  }, [quarterlySubView, allStudents, proformaFromDate, proformaToDate]);
 
   useEffect(() => {
     if (quarterlySubView && quarterlySubView !== "menu") {
@@ -312,33 +327,104 @@ function AdminDashboard() {
   // Load all students for local search/filters/options in Student Management
   const loadAll = async () => {
     try {
-      const [response, adminResponse] = await Promise.all([
-        fetchAdminStudents({
-          sortBy: "submittedAt",
-          sortOrder: "desc",
-        }),
-        fetchAdministration()
-      ]);
-      setAllStudents(response.students);
+      const adminResponse = await fetchAdministration();
       setAdministration(adminResponse.administration);
+
+      let fromDate = "";
+      let toDate = "";
+      if (quarterlySubView === "proforma") {
+        fromDate = adminResponse.administration?.proformaSelectedPeriod?.fromDate || "";
+        toDate = adminResponse.administration?.proformaSelectedPeriod?.toDate || "";
+      } else if (quarterlySubView === "first-quarter" || quarterlySubView === "second-quarter") {
+        fromDate = adminResponse.administration?.attendanceSelectedPeriod?.fromDate || "";
+        toDate = adminResponse.administration?.attendanceSelectedPeriod?.toDate || "";
+      }
+
+      let params = {
+        sortBy: "submittedAt",
+        sortOrder: "desc",
+      };
+      if (fromDate && toDate) {
+        params.isQuarterlyReport = "true";
+        params.fromDate = fromDate;
+        params.toDate = toDate;
+      }
+      const response = await fetchAdminStudents(params);
+      setAllStudents(response.students);
     } catch {
       setAllStudents([]);
     }
   };
 
+  const formatQuarterEnding = (dateStr) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    const day = String(date.getDate()).padStart(2, '0');
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
   useEffect(() => {
     if (administration) {
-      if (administration.proformaQuarterEnding) {
-        setProformaQuarterEnding(administration.proformaQuarterEnding);
+      if (administration.proformaSelectedPeriod?.fromDate && administration.proformaSelectedPeriod?.toDate) {
+        setProformaFromDate(administration.proformaSelectedPeriod.fromDate);
+        setProformaToDate(administration.proformaSelectedPeriod.toDate);
+        setProformaGenerated(true);
       }
-      if (administration.proformaSection1) {
-        setProformaSection1((prev) => ({
-          ...prev,
-          ...administration.proformaSection1
-        }));
+      if (administration.attendanceSelectedPeriod?.fromDate && administration.attendanceSelectedPeriod?.toDate) {
+        setAttendanceFromDate(administration.attendanceSelectedPeriod.fromDate);
+        setAttendanceToDate(administration.attendanceSelectedPeriod.toDate);
+        setAttendanceGenerated(true);
       }
     }
   }, [administration]);
+
+  useEffect(() => {
+    if (proformaGenerated && proformaFromDate && proformaToDate && administration) {
+      const periodKey = `${proformaFromDate}_${proformaToDate}`;
+      const saved = administration.proformas?.[periodKey];
+      if (saved) {
+        if (saved.proformaQuarterEnding) {
+          setProformaQuarterEnding(saved.proformaQuarterEnding);
+        } else {
+          setProformaQuarterEnding(formatQuarterEnding(proformaToDate));
+        }
+        if (saved.proformaSection1) {
+          setProformaSection1({
+            B_dg_cluster: "", C_dg_cluster: "", D_dg_cluster: "", E_dg_cluster: "", F_dg_cluster: "",
+            B_lab: "", B_remark: "",
+            C_lab: "", C_remark: "",
+            D_lab: "", D_remark: "",
+            E_lab: "", E_remark: "",
+            F_lab: "", F_remark: "",
+            ...saved.proformaSection1
+          });
+        } else {
+          setProformaSection1({
+            B_dg_cluster: "", C_dg_cluster: "", D_dg_cluster: "", E_dg_cluster: "", F_dg_cluster: "",
+            B_lab: "", B_remark: "",
+            C_lab: "", C_remark: "",
+            D_lab: "", D_remark: "",
+            E_lab: "", E_remark: "",
+            F_lab: "", F_remark: ""
+          });
+        }
+      } else {
+        setProformaQuarterEnding(formatQuarterEnding(proformaToDate));
+        setProformaSection1({
+          B_dg_cluster: "", C_dg_cluster: "", D_dg_cluster: "", E_dg_cluster: "", F_dg_cluster: "",
+          B_lab: "", B_remark: "",
+          C_lab: "", C_remark: "",
+          D_lab: "", D_remark: "",
+          E_lab: "", E_remark: "",
+          F_lab: "", F_remark: ""
+        });
+      }
+    }
+  }, [proformaGenerated, proformaFromDate, proformaToDate, administration]);
 
   useEffect(() => {
     loadAll();
@@ -939,7 +1025,7 @@ function AdminDashboard() {
                     (i) Engaged in Projects<br>
                     (ii) Engaged in other R&D activity
                 </td>
-                <td class="center"></td>
+                <td class="center">${escapeHtml(proformaSection1.B_dg_cluster)}</td>
                 <td colspan="2" class="center">${escapeHtml(proformaSection1.B_lab)}</td>
                 <td colspan="2">${escapeHtml(proformaSection1.B_remark)}</td>
             </tr>
@@ -951,7 +1037,7 @@ function AdminDashboard() {
                     (i) Under selection and likely to be engaged in Project / R&D activity<br>
                     (ii) Not under selection
                 </td>
-                <td class="center"></td>
+                <td class="center">${escapeHtml(proformaSection1.C_dg_cluster)}</td>
                 <td colspan="2" class="center">${escapeHtml(proformaSection1.C_lab)}</td>
                 <td colspan="2">${escapeHtml(proformaSection1.C_remark)}</td>
             </tr>
@@ -959,7 +1045,7 @@ function AdminDashboard() {
             <tr>
                 <td colspan="4">D</td>
                 <td>Internship awarded in the reporting period:</td>
-                <td class="center"></td>
+                <td class="center">${escapeHtml(proformaSection1.D_dg_cluster)}</td>
                 <td colspan="2" class="center">${escapeHtml(proformaSection1.D_lab)}</td>
                 <td colspan="2">${escapeHtml(proformaSection1.D_remark)}</td>
             </tr>
@@ -967,7 +1053,7 @@ function AdminDashboard() {
             <tr>
                 <td colspan="4">E</td>
                 <td>Intern / candidate resigned / terminated in the reporting period:</td>
-                <td class="center"></td>
+                <td class="center">${escapeHtml(proformaSection1.E_dg_cluster)}</td>
                 <td colspan="2" class="center">${escapeHtml(proformaSection1.E_lab)}</td>
                 <td colspan="2">${escapeHtml(proformaSection1.E_remark)}</td>
             </tr>
@@ -975,8 +1061,8 @@ function AdminDashboard() {
             <tr>
                 <td colspan="4">F</td>
                 <td>Details of achievement:</td>
-                <td colspan="2"></td>
-                <td class="center">${escapeHtml(proformaSection1.F_lab)}</td>
+                <td class="center">${escapeHtml(proformaSection1.F_dg_cluster)}</td>
+                <td colspan="2" class="center">${escapeHtml(proformaSection1.F_lab)}</td>
                 <td colspan="2">${escapeHtml(proformaSection1.F_remark)}</td>
             </tr>
         </tbody>
@@ -1059,23 +1145,28 @@ function AdminDashboard() {
     }
   }, [getProformaHtml]);
 
-  const getAttendanceReportHtml = useCallback((quarter) => {
+  const getAttendanceReportHtml = useCallback((fromDate, toDate, quarter) => {
     const approvedPaidStudents = allStudents.filter(
-      (s) => s.status === "Approved" && s.internshipType === "Paid"
+      (s) => {
+        if (s.status !== "Approved" || s.internshipType !== "Paid") return false;
+        const joining = s.trainingManagement?.fromDate || "";
+        if (fromDate && toDate) {
+          return joining >= fromDate && joining <= toDate;
+        }
+        return true;
+      }
     );
 
     const rowsHtml = approvedPaidStudents
       .map((student, index) => {
         const report = quarter === 1 ? student.firstQuarterReport : student.secondQuarterReport;
         const bank = student.bankDetails || {};
-        
+
         let period = "-";
         if (report?.fromDate && report?.toDate) {
-          const fromDateFormatted = formatReportDate(report.fromDate);
-          const toDateFormatted = formatReportDate(report.toDate);
-          period = `${fromDateFormatted} - ${toDateFormatted}`;
+          period = `${formatReportDate(report.fromDate)} - ${formatReportDate(report.toDate)}`;
         }
-        
+
         const days = report?.daysPresent !== undefined && report?.daysPresent !== "" ? report.daysPresent : "-";
 
         return `
@@ -1096,7 +1187,7 @@ function AdminDashboard() {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Attendance Report for the last 3 months period</title>
+    <title>Attendance Report</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -1149,7 +1240,7 @@ function AdminDashboard() {
 <body>
 
     <div class="title">
-        Attendance Report for the last 3 months period
+        Attendance Report for period ${formatReportDate(fromDate)} - ${formatReportDate(toDate)}
     </div>
 
     <table>
@@ -1173,9 +1264,16 @@ function AdminDashboard() {
 </html>`;
   }, [allStudents]);
 
-  const downloadExcel = useCallback((quarter) => {
+  const downloadExcel = useCallback((fromDate, toDate, quarter) => {
     const approvedPaidStudents = allStudents.filter(
-      (s) => s.status === "Approved" && s.internshipType === "Paid"
+      (s) => {
+        if (s.status !== "Approved" || s.internshipType !== "Paid") return false;
+        const joining = s.trainingManagement?.fromDate || "";
+        if (fromDate && toDate) {
+          return joining >= fromDate && joining <= toDate;
+        }
+        return true;
+      }
     );
     const headers = ["SRNO", "STUDENT NAME", "PERIOD", "No. of Present (DAYS)", "BANK NAME", "Saving A/c no", "IFSC"];
     const rows = approvedPaidStudents.map((student, index) => {
@@ -1196,24 +1294,24 @@ function AdminDashboard() {
         bank.ifsc || "-"
       ];
     });
-    
+
     const csvContent = [headers.join(","), ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\r\n");
     const blob = new Blob(["\ufeff", csvContent], { type: "text/csv;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `Attendance_Report_Quarter_${quarter}.csv`;
+    link.download = `Attendance_Report_${fromDate}_to_${toDate}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   }, [allStudents]);
 
-  const handleDownloadPdf = useCallback(async (quarter) => {
+  const handleDownloadPdf = useCallback(async (fromDate, toDate, quarter) => {
     try {
-      const htmlContent = getAttendanceReportHtml(quarter);
+      const htmlContent = getAttendanceReportHtml(fromDate, toDate, quarter);
       const blob = await downloadAttendanceReportPdf(htmlContent);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Attendance_Report_Quarter_${quarter}.pdf`;
+      link.download = `Attendance_Report_${fromDate}_to_${toDate}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -1221,8 +1319,8 @@ function AdminDashboard() {
     }
   }, [getAttendanceReportHtml]);
 
-  const handlePrint = useCallback((quarter) => {
-    const htmlContent = getAttendanceReportHtml(quarter);
+  const handlePrint = useCallback((fromDate, toDate, quarter) => {
+    const htmlContent = getAttendanceReportHtml(fromDate, toDate, quarter);
     const printWindow = window.open("", "_blank");
     if (printWindow) {
       printWindow.document.write(htmlContent);
@@ -1247,6 +1345,100 @@ function AdminDashboard() {
       next[index] = { ...next[index], [field]: value };
       return next;
     });
+  };
+
+  const generateProformaReport = async () => {
+    console.log("GENERATE REPORT CLICKED");
+    if (!proformaFromDate || !proformaToDate) {
+      alert("Please select a valid From Date and To Date.");
+      return;
+    }
+    if (new Date(proformaFromDate) > new Date(proformaToDate)) {
+      alert("Please select a valid From Date and To Date.");
+      return;
+    }
+    try {
+      await saveProformaConfig({
+        proformaSelectedPeriod: { fromDate: proformaFromDate, toDate: proformaToDate }
+      });
+      const response = await fetchAdminStudents({
+        isQuarterlyReport: "true",
+        fromDate: proformaFromDate,
+        toDate: proformaToDate
+      });
+
+      console.log("FROM DATE:", proformaFromDate);
+      console.log("TO DATE:", proformaToDate);
+      const paidApprovedStudents = response.students.filter(s => s.status === "Approved" && s.internshipType === "Paid");
+      console.log("ALL PAID APPROVED STUDENTS:", paidApprovedStudents);
+      const filteredStudents = paidApprovedStudents.filter(s => {
+        const joining = s.trainingManagement?.fromDate || "";
+        return joining >= proformaFromDate && joining <= proformaToDate;
+      });
+      console.log("FILTERED STUDENTS:", filteredStudents);
+      filteredStudents.forEach(student => {
+        const joining = student.trainingManagement?.fromDate || "";
+        console.log({
+          name: student.name,
+          joiningDate: joining,
+          fromDate: proformaFromDate,
+          toDate: proformaToDate,
+          included: true
+        });
+      });
+
+      setAllStudents(response.students);
+      setProformaGenerated(true);
+    } catch (err) {
+      alert("Failed to save selected period: " + err.message);
+    }
+  };
+
+  const generateAttendanceReport = async () => {
+    console.log("GENERATE REPORT CLICKED");
+    if (!attendanceFromDate || !attendanceToDate) {
+      alert("Please select a valid From Date and To Date.");
+      return;
+    }
+    if (new Date(attendanceFromDate) > new Date(attendanceToDate)) {
+      alert("Please select a valid From Date and To Date.");
+      return;
+    }
+    try {
+      await saveProformaConfig({
+        attendanceSelectedPeriod: { fromDate: attendanceFromDate, toDate: attendanceToDate }
+      });
+      const response = await fetchAdminStudents({
+        isQuarterlyReport: "true",
+        fromDate: attendanceFromDate,
+        toDate: attendanceToDate
+      });
+
+      console.log("FROM DATE:", attendanceFromDate);
+      console.log("TO DATE:", attendanceToDate);
+      const paidApprovedStudents = response.students.filter(s => s.status === "Approved" && s.internshipType === "Paid");
+      console.log("ALL PAID APPROVED STUDENTS:", paidApprovedStudents);
+      const filteredStudents = paidApprovedStudents.filter(s => {
+        const joining = s.trainingManagement?.fromDate || "";
+        return joining >= attendanceFromDate && joining <= attendanceToDate;
+      });
+      console.log("FILTERED STUDENTS:", filteredStudents);
+      filteredStudents.forEach(student => {
+        const joining = student.trainingManagement?.fromDate || "";
+        console.log({
+          name: student.name,
+          joiningDate: joining,
+          fromDate: attendanceFromDate,
+          toDate: attendanceToDate,
+          included: true
+        });
+      });
+
+      setAllStudents(response.students);
+      setAttendanceGenerated(true);
+    } catch (err) {
+      alert("Failed to save selected period: " + err.message);
+    }
   };
 
   const [isSavingProforma, setIsSavingProforma] = useState(false);
@@ -1309,12 +1501,13 @@ function AdminDashboard() {
 
         await updateStudentReview(s._id, payload);
       }
-      
+
       await saveProformaConfig({
+        reportPeriod: `${proformaFromDate}_${proformaToDate}`,
         proformaQuarterEnding,
         proformaSection1
       });
-      
+
       alert("Proforma changes saved successfully!");
       await loadAll();
     } catch (err) {
@@ -1334,11 +1527,11 @@ function AdminDashboard() {
             ...(updated.bankDetails || {}),
             [field]: value
           };
-        } else if (field === "fromDate" || field === "toDate" || field === "daysPresent") {
-          const reportKey = quarter === 1 ? "firstQuarterReport" : "secondQuarterReport";
-          updated[reportKey] = {
-            ...(updated[reportKey] || {}),
-            [field]: value
+        } else if (field === "daysPresent") {
+          const slot = quarter === 1 ? "firstQuarterReport" : "secondQuarterReport";
+          updated[slot] = {
+            ...(updated[slot] || {}),
+            daysPresent: value
           };
         }
         return updated;
@@ -1346,7 +1539,7 @@ function AdminDashboard() {
     );
   };
 
-  const saveAttendanceChanges = async (quarter) => {
+  const saveAttendanceChanges = async (fromDate, toDate, quarter) => {
     setIsSavingProforma(true);
     try {
       const approvedPaidStudents = allStudents.filter(
@@ -1369,16 +1562,17 @@ function AdminDashboard() {
         return val;
       };
 
+      const slot = quarter === 1 ? "firstQuarterReport" : "secondQuarterReport";
+
       for (const s of approvedPaidStudents) {
-        const report = quarter === 1 ? s.firstQuarterReport : s.secondQuarterReport;
-        const reportKey = quarter === 1 ? "firstQuarterReport" : "secondQuarterReport";
+        const report = s[slot] || {};
 
         const payload = {
           bankDetails: s.bankDetails || {},
-          [reportKey]: {
-            fromDate: parseDateInput(report?.fromDate),
-            toDate: parseDateInput(report?.toDate),
-            daysPresent: report?.daysPresent || "",
+          [slot]: {
+            fromDate: parseDateInput(report.fromDate),
+            toDate: parseDateInput(report.toDate),
+            daysPresent: report.daysPresent || "",
           }
         };
 
@@ -1393,14 +1587,21 @@ function AdminDashboard() {
     }
   };
 
-  const renderQuarterTable = (quarter) => {
+  const renderAttendanceReportTable = (fromDate, toDate, quarter) => {
     const approvedPaidStudents = allStudents.filter(
-      (s) => s.status === "Approved" && s.internshipType === "Paid"
+      (s) => {
+        if (s.status !== "Approved" || s.internshipType !== "Paid") return false;
+        const joining = s.trainingManagement?.fromDate || "";
+        if (fromDate && toDate) {
+          return joining >= fromDate && joining <= toDate;
+        }
+        return true;
+      }
     );
 
     return (
       <div style={{ marginTop: "24px", background: "#fff", padding: "24px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)" }}>
-        <h3 style={{ textAlign: "center", marginBottom: "20px" }}>Attendance Report for the last 3 months period</h3>
+        <h3 style={{ textAlign: "center", marginBottom: "20px" }}>Attendance Report for period {formatReportDate(fromDate)} - {formatReportDate(toDate)}</h3>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", color: "#000" }}>
             <thead>
@@ -1419,29 +1620,14 @@ function AdminDashboard() {
                 approvedPaidStudents.map((student, index) => {
                   const report = quarter === 1 ? student.firstQuarterReport : student.secondQuarterReport;
                   const bank = student.bankDetails || {};
+                  const periodText = report?.fromDate && report?.toDate
+                    ? `${formatReportDate(report.fromDate)} - ${formatReportDate(report.toDate)}`
+                    : "-";
                   return (
                     <tr key={student._id}>
                       <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>{index + 1}</td>
                       <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>{student.name}</td>
-                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>
-                        <div style={{ display: "flex", gap: "4px", alignItems: "center", justifyContent: "center" }}>
-                          <input
-                            type="text"
-                            placeholder="From (YYYY-MM-DD)"
-                            value={report?.fromDate || ""}
-                            onChange={(e) => updateAttendanceStudent(student._id, "fromDate", e.target.value, quarter)}
-                            style={{ border: "1px dashed #ccc", padding: "2px", fontSize: "11px", width: "100px" }}
-                          />
-                          <span>-</span>
-                          <input
-                            type="text"
-                            placeholder="To (YYYY-MM-DD)"
-                            value={report?.toDate || ""}
-                            onChange={(e) => updateAttendanceStudent(student._id, "toDate", e.target.value, quarter)}
-                            style={{ border: "1px dashed #ccc", padding: "2px", fontSize: "11px", width: "100px" }}
-                          />
-                        </div>
-                      </td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>{periodText}</td>
                       <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>
                         <input
                           type="text"
@@ -1789,18 +1975,18 @@ function AdminDashboard() {
           {quarterlySubView === "attendance" && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-                <h2 style={{ margin: 0 }}>Attendance Report Options</h2>
+                <h2 style={{ margin: 0 }}>Attendance Report</h2>
                 <button className="admin-secondary-btn" type="button" onClick={() => setQuarterlySubView("menu")}>Back</button>
               </div>
-              <div className="admin-dashboard-home-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px" }}>
+              <div className="admin-dashboard-home-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px", marginTop: "20px" }}>
                 <div className="admin-summary-card" style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "16px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)" }}>
                   <h3 style={{ margin: 0, color: "var(--primary)" }}>First Quarter Report</h3>
-                  <p style={{ margin: 0, color: "var(--text-muted)" }}>Generate attendance report for the first 3 months.</p>
+                  <p style={{ margin: 0, color: "var(--text-muted)" }}>Open attendance report for the first 3 months.</p>
                   <button className="admin-primary-btn" type="button" onClick={() => setQuarterlySubView("first-quarter")} style={{ width: "fit-content", padding: "8px 24px", height: "auto" }}>Open</button>
                 </div>
                 <div className="admin-summary-card" style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "16px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)" }}>
                   <h3 style={{ margin: 0, color: "var(--primary)" }}>Second Quarter Report</h3>
-                  <p style={{ margin: 0, color: "var(--text-muted)" }}>Generate attendance report for the second 3 months.</p>
+                  <p style={{ margin: 0, color: "var(--text-muted)" }}>Open attendance report for the second 3 months.</p>
                   <button className="admin-primary-btn" type="button" onClick={() => setQuarterlySubView("second-quarter")} style={{ width: "fit-content", padding: "8px 24px", height: "auto" }}>Open</button>
                 </div>
               </div>
@@ -1809,33 +1995,75 @@ function AdminDashboard() {
 
           {quarterlySubView === "first-quarter" && (
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <h2 style={{ margin: 0 }}>First Quarter Report</h2>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                <h2 style={{ margin: 0 }}>First Quarter Attendance Report</h2>
                 <div style={{ display: "flex", gap: "12px" }}>
-                  <button className="admin-primary-btn" type="button" onClick={() => saveAttendanceChanges(1)} disabled={isSavingProforma}>{isSavingProforma ? "Saving..." : "Save Changes"}</button>
-                  <button className="admin-primary-btn" type="button" onClick={() => downloadExcel(1)}>Download Excel</button>
-                  <button className="admin-primary-btn" type="button" onClick={() => handleDownloadPdf(1)}>Download PDF</button>
-                  <button className="admin-primary-btn" type="button" onClick={() => handlePrint(1)}>Print</button>
+                  {attendanceGenerated && (
+                    <>
+                      <button className="admin-primary-btn" type="button" onClick={() => saveAttendanceChanges(attendanceFromDate, attendanceToDate, 1)} disabled={isSavingProforma}>{isSavingProforma ? "Saving..." : "Save Changes"}</button>
+                      <button className="admin-primary-btn" type="button" onClick={() => downloadExcel(attendanceFromDate, attendanceToDate, 1)}>Download Excel</button>
+                      <button className="admin-primary-btn" type="button" onClick={() => handleDownloadPdf(attendanceFromDate, attendanceToDate, 1)}>Download PDF</button>
+                      <button className="admin-primary-btn" type="button" onClick={() => handlePrint(attendanceFromDate, attendanceToDate, 1)}>Print</button>
+                    </>
+                  )}
                   <button className="admin-secondary-btn" type="button" onClick={() => setQuarterlySubView("attendance")}>Back</button>
                 </div>
               </div>
-              {renderQuarterTable(1)}
+
+              <div style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "16px", background: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", color: "#000" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <label style={{ fontWeight: "600", fontSize: "0.9rem" }}>From Date:</label>
+                  <input type="date" value={attendanceFromDate} onChange={(e) => setAttendanceFromDate(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: "4px" }} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <label style={{ fontWeight: "600", fontSize: "0.9rem" }}>To Date:</label>
+                  <input type="date" value={attendanceToDate} onChange={(e) => setAttendanceToDate(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: "4px" }} />
+                </div>
+                <button className="admin-primary-btn" type="button" onClick={generateAttendanceReport} style={{ height: "auto", padding: "8px 16px" }}>Generate Report</button>
+              </div>
+
+              {attendanceGenerated ? renderAttendanceReportTable(attendanceFromDate, attendanceToDate, 1) : (
+                <div style={{ padding: "40px", textAlign: "center", background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0", color: "var(--text-muted)", fontSize: "1.1rem" }}>
+                  Please select a valid From Date and To Date above, and click Generate Report.
+                </div>
+              )}
             </div>
           )}
 
           {quarterlySubView === "second-quarter" && (
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <h2 style={{ margin: 0 }}>Second Quarter Report</h2>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                <h2 style={{ margin: 0 }}>Second Quarter Attendance Report</h2>
                 <div style={{ display: "flex", gap: "12px" }}>
-                  <button className="admin-primary-btn" type="button" onClick={() => saveAttendanceChanges(2)} disabled={isSavingProforma}>{isSavingProforma ? "Saving..." : "Save Changes"}</button>
-                  <button className="admin-primary-btn" type="button" onClick={() => downloadExcel(2)}>Download Excel</button>
-                  <button className="admin-primary-btn" type="button" onClick={() => handleDownloadPdf(2)}>Download PDF</button>
-                  <button className="admin-primary-btn" type="button" onClick={() => handlePrint(2)}>Print</button>
+                  {attendanceGenerated && (
+                    <>
+                      <button className="admin-primary-btn" type="button" onClick={() => saveAttendanceChanges(attendanceFromDate, attendanceToDate, 2)} disabled={isSavingProforma}>{isSavingProforma ? "Saving..." : "Save Changes"}</button>
+                      <button className="admin-primary-btn" type="button" onClick={() => downloadExcel(attendanceFromDate, attendanceToDate, 2)}>Download Excel</button>
+                      <button className="admin-primary-btn" type="button" onClick={() => handleDownloadPdf(attendanceFromDate, attendanceToDate, 2)}>Download PDF</button>
+                      <button className="admin-primary-btn" type="button" onClick={() => handlePrint(attendanceFromDate, attendanceToDate, 2)}>Print</button>
+                    </>
+                  )}
                   <button className="admin-secondary-btn" type="button" onClick={() => setQuarterlySubView("attendance")}>Back</button>
                 </div>
               </div>
-              {renderQuarterTable(2)}
+
+              <div style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "16px", background: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", color: "#000" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <label style={{ fontWeight: "600", fontSize: "0.9rem" }}>From Date:</label>
+                  <input type="date" value={attendanceFromDate} onChange={(e) => setAttendanceFromDate(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: "4px" }} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <label style={{ fontWeight: "600", fontSize: "0.9rem" }}>To Date:</label>
+                  <input type="date" value={attendanceToDate} onChange={(e) => setAttendanceToDate(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: "4px" }} />
+                </div>
+                <button className="admin-primary-btn" type="button" onClick={generateAttendanceReport} style={{ height: "auto", padding: "8px 16px" }}>Generate Report</button>
+              </div>
+
+              {attendanceGenerated ? renderAttendanceReportTable(attendanceFromDate, attendanceToDate, 2) : (
+                <div style={{ padding: "40px", textAlign: "center", background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0", color: "var(--text-muted)", fontSize: "1.1rem" }}>
+                  Please select a valid From Date and To Date above, and click Generate Report.
+                </div>
+              )}
             </div>
           )}
 
@@ -1844,258 +2072,359 @@ function AdminDashboard() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
                 <h2 style={{ margin: 0 }}>Proforma for Quarterly Report</h2>
                 <div style={{ display: "flex", gap: "12px" }}>
-                  <button className="admin-primary-btn" type="button" onClick={saveProformaChanges} disabled={isSavingProforma}>{isSavingProforma ? "Saving..." : "Save Changes"}</button>
-                  <button className="admin-primary-btn" type="button" onClick={downloadProformaExcel}>Download Excel</button>
-                  <button className="admin-primary-btn" type="button" onClick={handleProformaPrint}>Print</button>
+                  {proformaGenerated && (
+                    <>
+                      <button className="admin-primary-btn" type="button" onClick={saveProformaChanges} disabled={isSavingProforma}>{isSavingProforma ? "Saving..." : "Save Changes"}</button>
+                      <button className="admin-primary-btn" type="button" onClick={downloadProformaExcel}>Download Excel</button>
+                      <button className="admin-primary-btn" type="button" onClick={handleProformaPrint}>Print</button>
+                    </>
+                  )}
                   <button className="admin-secondary-btn" type="button" onClick={() => setQuarterlySubView("menu")}>Back</button>
                 </div>
               </div>
 
-              <div style={{ background: "#fff", padding: "24px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)", color: "#000", fontFamily: "Arial, sans-serif", fontSize: "11px" }}>
-                <div style={{ textAlign: "center", fontWeight: "bold", fontSize: "13px", marginBottom: "10px", textDecoration: "underline" }}>
-                  PROFORMA FOR QUARTERLY REPORT IN R/O DRDO PAID INTERNSHIP SCHEME
+              <div style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "16px", background: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", color: "#000" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <label style={{ fontWeight: "600", fontSize: "0.9rem" }}>From Date:</label>
+                  <input type="date" value={proformaFromDate} onChange={(e) => setProformaFromDate(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: "4px" }} />
                 </div>
-                <div style={{ textAlign: "right", fontSize: "10px", marginBottom: "10px" }}>
-                  To be maintained at DG Cluster / Lab Level
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <label style={{ fontWeight: "600", fontSize: "0.9rem" }}>To Date:</label>
+                  <input type="date" value={proformaToDate} onChange={(e) => setProformaToDate(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: "4px" }} />
                 </div>
+                <button className="admin-primary-btn" type="button" onClick={generateProformaReport} style={{ height: "auto", padding: "8px 16px" }}>Generate Report</button>
+              </div>
 
-                <div style={{ marginBottom: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <h3 style={{ margin: 0, fontSize: "11px" }}>Quarterly report for quarter ending:</h3>
-                  <input
-                    type="text"
-                    value={proformaQuarterEnding}
-                    onChange={(e) => setProformaQuarterEnding(e.target.value)}
-                    placeholder="e.g. 30 Sept 2026"
-                    style={{ border: "1px dashed #ccc", padding: "2px 4px", fontSize: "11px" }}
-                  />
+              {(() => {
+                const paidStudents = allStudents.filter(s => s.internshipType === "Paid");
+                const paidApprovedStudents = allStudents.filter(s => s.status === "Approved" && s.internshipType === "Paid");
+                console.log("========== PROFORMA DEBUG ==========");
+                console.log("FROM DATE:", proformaFromDate);
+                console.log("TO DATE:", proformaToDate);
+                console.log("ALL STUDENTS:", allStudents.map(s => ({
+                  name: s.name,
+                  status: s.status,
+                  joiningDate: s.trainingManagement?.fromDate
+                })));
+                console.log("PAID STUDENTS:", paidStudents.map(s => ({
+                  name: s.name,
+                  joiningDate: s.trainingManagement?.fromDate
+                })));
+                console.log("APPROVED + PAID STUDENTS:", paidApprovedStudents.map(s => ({
+                  name: s.name,
+                  joiningDate: s.trainingManagement?.fromDate
+                })));
+                console.log("FINAL FILTERED STUDENTS:", proformaStudents.map(s => ({
+                  name: s.name,
+                  joiningDate: s.joiningDate
+                })));
+
+                const testNames = ["Rihan", "Krishna", "Rishi", "Aarvi"];
+                allStudents.forEach(s => {
+                  if (testNames.includes(s.name)) {
+                    const joining = s.trainingManagement?.fromDate || "";
+                    const dateMatches = joining >= proformaFromDate && joining <= proformaToDate;
+                    console.log({
+                      name: s.name,
+                      status: s.status,
+                      paymentType: s.internshipType,
+                      actualJoiningDate: joining,
+                      fromDate: proformaFromDate,
+                      toDate: proformaToDate,
+                      dateMatches,
+                      finalIncluded: proformaStudents.some(p => p._id === s._id)
+                    });
+                  }
+                });
+                return null;
+              })()}
+
+              {!proformaGenerated ? (
+                <div style={{ padding: "40px", textAlign: "center", background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0", color: "var(--text-muted)", fontSize: "1.1rem" }}>
+                  Please select a valid From Date and To Date above, and click Generate Report.
                 </div>
+              ) : (
+                <div style={{ background: "#fff", padding: "24px", borderRadius: "12px", border: "1px solid var(--border-color, #e2e8f0)", color: "#000", fontFamily: "Arial, sans-serif", fontSize: "11px" }}>
+                  <div style={{ textAlign: "center", fontWeight: "bold", fontSize: "13px", marginBottom: "10px", textDecoration: "underline" }}>
+                    PROFORMA FOR QUARTERLY REPORT IN R/O DRDO PAID INTERNSHIP SCHEME
+                  </div>
+                  <div style={{ textAlign: "right", fontSize: "10px", marginBottom: "10px" }}>
+                    To be maintained at DG Cluster / Lab Level
+                  </div>
 
-                <h3 style={{ margin: "10px 0 5px 0", fontSize: "11px" }}>1. BRIEF OF REPORT:</h3>
-                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
-                  <thead>
-                    <tr style={{ backgroundColor: "#f2f2f2" }}>
-                      <th colSpan="5" style={{ border: "1px solid #000" }}></th>
-                      <th style={{ border: "1px solid #000", padding: "3px 4px", fontWeight: "bold", textAlign: "center" }}>DG Cluster</th>
-                      <th colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", fontWeight: "bold", textAlign: "center" }}>Lab / Estt</th>
-                      <th colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", fontWeight: "bold", textAlign: "center" }}>Remark</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>A</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Authorization of Intern:</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>Total students = {administration?.paidSeatLimit ?? 0}</td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>IRDE</td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}></td>
-                    </tr>
-                    <tr>
-                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>B</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        Held Strength of Intern / candidate:<br />
-                        (i) Engaged in Projects<br />
-                        (ii) Engaged in other R&D activity
-                      </td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}></td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.B_lab}
-                          onChange={(e) => updateSection1("B_lab", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.B_remark}
-                          onChange={(e) => updateSection1("B_remark", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>C</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        Vacant Intern / Candidate:<br />
-                        (i) Under selection and likely to be engaged in Project / R&D activity<br />
-                        (ii) Not under selection
-                      </td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}></td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.C_lab}
-                          onChange={(e) => updateSection1("C_lab", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.C_remark}
-                          onChange={(e) => updateSection1("C_remark", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>D</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Internship awarded in the reporting period:</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}></td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.D_lab}
-                          onChange={(e) => updateSection1("D_lab", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.D_remark}
-                          onChange={(e) => updateSection1("D_remark", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>E</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Intern / candidate resigned / terminated in the reporting period:</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}></td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.E_lab}
-                          onChange={(e) => updateSection1("E_lab", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.E_remark}
-                          onChange={(e) => updateSection1("E_remark", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>F</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Details of achievement:</td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}></td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.F_lab}
-                          onChange={(e) => updateSection1("F_lab", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                      <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                        <input
-                          type="text"
-                          value={proformaSection1.F_remark}
-                          onChange={(e) => updateSection1("F_remark", e.target.value)}
-                          style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                  <div style={{ marginBottom: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <h3 style={{ margin: 0, fontSize: "11px" }}>Quarterly report for quarter ending:</h3>
+                    <input
+                      type="text"
+                      value={proformaQuarterEnding}
+                      onChange={(e) => setProformaQuarterEnding(e.target.value)}
+                      placeholder="e.g. 30 Sept 2026"
+                      style={{ border: "1px dashed #ccc", padding: "2px 4px", fontSize: "11px" }}
+                    />
+                  </div>
 
-                <h3 style={{ margin: "20px 0 5px 0", fontSize: "11px" }}>2. DETAILS IN R/O EACH INTERN:</h3>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <h3 style={{ margin: "10px 0 5px 0", fontSize: "11px" }}>1. BRIEF OF REPORT:</h3>
+                  <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
                     <thead>
                       <tr style={{ backgroundColor: "#f2f2f2" }}>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>S.No</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name of Intern</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Discipline</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Gender</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of Birth</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of joining the Lab</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name of Project</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Title of assignment</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name of the Supervisor</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name & PDC of the Project in which working</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Achievements</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of Completion of internship</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of Resignation, if applicable</th>
-                        <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Remarks</th>
-                      </tr>
-                      <tr style={{ textAlign: "center", backgroundColor: "#fafafa" }}>
-                        <td style={{ border: "1px solid #000" }}></td>
-                        <td style={{ border: "1px solid #000" }}>(1)</td>
-                        <td style={{ border: "1px solid #000" }}>(2)</td>
-                        <td style={{ border: "1px solid #000" }}>(3)</td>
-                        <td style={{ border: "1px solid #000" }}>(4)</td>
-                        <td style={{ border: "1px solid #000" }}>(5)</td>
-                        <td style={{ border: "1px solid #000" }}>(6)</td>
-                        <td style={{ border: "1px solid #000" }}>(7)</td>
-                        <td style={{ border: "1px solid #000" }}>(8)</td>
-                        <td style={{ border: "1px solid #000" }}>(9)</td>
-                        <td style={{ border: "1px solid #000" }}>(10)</td>
-                        <td style={{ border: "1px solid #000" }}>(11)</td>
-                        <td style={{ border: "1px solid #000" }}>(12)</td>
-                        <td style={{ border: "1px solid #000" }}>(13)</td>
+                        <th colSpan="5" style={{ border: "1px solid #000" }}></th>
+                        <th style={{ border: "1px solid #000", padding: "3px 4px", fontWeight: "bold", textAlign: "center" }}>DG Cluster</th>
+                        <th colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", fontWeight: "bold", textAlign: "center" }}>Lab / Estt</th>
+                        <th colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", fontWeight: "bold", textAlign: "center" }}>Remark</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {proformaStudents.length > 0 ? (
-                        proformaStudents.map((s, idx) => (
-                          <tr key={s._id}>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>{idx + 1}</td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.name} onChange={(e) => updateStudentRow(idx, "name", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.discipline} onChange={(e) => updateStudentRow(idx, "discipline", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.gender} onChange={(e) => updateStudentRow(idx, "gender", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.dob} onChange={(e) => updateStudentRow(idx, "dob", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.joiningDate} onChange={(e) => updateStudentRow(idx, "joiningDate", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.projectName} onChange={(e) => updateStudentRow(idx, "projectName", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.designationTitle} onChange={(e) => updateStudentRow(idx, "designationTitle", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.supervisorName} onChange={(e) => updateStudentRow(idx, "supervisorName", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.projectNameAndPdc} onChange={(e) => updateStudentRow(idx, "projectNameAndPdc", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.achievements} onChange={(e) => updateStudentRow(idx, "achievements", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.completionDate} onChange={(e) => updateStudentRow(idx, "completionDate", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.resignationDate} onChange={(e) => updateStudentRow(idx, "resignationDate", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                            <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
-                              <input type="text" value={s.remarks} onChange={(e) => updateStudentRow(idx, "remarks", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="14" style={{ textAlign: "center", padding: "12px", border: "1px solid #000" }}>No approved Paid student records found.</td>
-                        </tr>
-                      )}
+                      <tr>
+                        <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>A</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Authorization of Intern:</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>Total students = {administration?.paidSeatLimit ?? 0}</td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>IRDE</td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}></td>
+                      </tr>
+                      <tr>
+                        <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>B</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          Held Strength of Intern / candidate:<br />
+                          (i) Engaged in Projects<br />
+                          (ii) Engaged in other R&D activity
+                        </td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.B_dg_cluster || ""}
+                            onChange={(e) => updateSection1("B_dg_cluster", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px", textAlign: "center" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.B_lab}
+                            onChange={(e) => updateSection1("B_lab", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.B_remark}
+                            onChange={(e) => updateSection1("B_remark", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>C</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          Vacant Intern / Candidate:<br />
+                          (i) Under selection and likely to be engaged in Project / R&D activity<br />
+                          (ii) Not under selection
+                        </td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.C_dg_cluster || ""}
+                            onChange={(e) => updateSection1("C_dg_cluster", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px", textAlign: "center" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.C_lab}
+                            onChange={(e) => updateSection1("C_lab", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.C_remark}
+                            onChange={(e) => updateSection1("C_remark", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>D</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Internship awarded in the reporting period:</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.D_dg_cluster || ""}
+                            onChange={(e) => updateSection1("D_dg_cluster", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px", textAlign: "center" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.D_lab}
+                            onChange={(e) => updateSection1("D_lab", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.D_remark}
+                            onChange={(e) => updateSection1("D_remark", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>E</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Intern / candidate resigned / terminated in the reporting period:</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.E_dg_cluster || ""}
+                            onChange={(e) => updateSection1("E_dg_cluster", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px", textAlign: "center" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.E_lab}
+                            onChange={(e) => updateSection1("E_lab", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.E_remark}
+                            onChange={(e) => updateSection1("E_remark", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>F</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Details of achievement:</td>
+                        <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.F_dg_cluster || ""}
+                            onChange={(e) => updateSection1("F_dg_cluster", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px", textAlign: "center" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.F_lab}
+                            onChange={(e) => updateSection1("F_lab", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                        <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                          <input
+                            type="text"
+                            value={proformaSection1.F_remark}
+                            onChange={(e) => updateSection1("F_remark", e.target.value)}
+                            style={{ border: "1px dashed #ccc", width: "100%", padding: "2px", boxSizing: "border-box", fontSize: "11px" }}
+                          />
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
+
+                  <h3 style={{ margin: "20px 0 5px 0", fontSize: "11px" }}>2. DETAILS IN R/O EACH INTERN:</h3>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ backgroundColor: "#f2f2f2" }}>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>S.No</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name of Intern</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Discipline</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Gender</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of Birth</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of joining the Lab</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name of Project</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Title of assignment</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name of the Supervisor</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Name & PDC of the Project in which working</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Achievements</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of Completion of internship</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Date of Resignation, if applicable</th>
+                          <th style={{ border: "1px solid #000", padding: "3px 4px" }}>Remarks</th>
+                        </tr>
+                        <tr style={{ textAlign: "center", backgroundColor: "#fafafa" }}>
+                          <td style={{ border: "1px solid #000" }}></td>
+                          <td style={{ border: "1px solid #000" }}>(1)</td>
+                          <td style={{ border: "1px solid #000" }}>(2)</td>
+                          <td style={{ border: "1px solid #000" }}>(3)</td>
+                          <td style={{ border: "1px solid #000" }}>(4)</td>
+                          <td style={{ border: "1px solid #000" }}>(5)</td>
+                          <td style={{ border: "1px solid #000" }}>(6)</td>
+                          <td style={{ border: "1px solid #000" }}>(7)</td>
+                          <td style={{ border: "1px solid #000" }}>(8)</td>
+                          <td style={{ border: "1px solid #000" }}>(9)</td>
+                          <td style={{ border: "1px solid #000" }}>(10)</td>
+                          <td style={{ border: "1px solid #000" }}>(11)</td>
+                          <td style={{ border: "1px solid #000" }}>(12)</td>
+                          <td style={{ border: "1px solid #000" }}>(13)</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proformaStudents.length > 0 ? (
+                          proformaStudents.map((s, idx) => (
+                            <tr key={s._id}>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>{idx + 1}</td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.name} onChange={(e) => updateStudentRow(idx, "name", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.discipline} onChange={(e) => updateStudentRow(idx, "discipline", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.gender} onChange={(e) => updateStudentRow(idx, "gender", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.dob} onChange={(e) => updateStudentRow(idx, "dob", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.joiningDate} onChange={(e) => updateStudentRow(idx, "joiningDate", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.projectName} onChange={(e) => updateStudentRow(idx, "projectName", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.designationTitle} onChange={(e) => updateStudentRow(idx, "designationTitle", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.supervisorName} onChange={(e) => updateStudentRow(idx, "supervisorName", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.projectNameAndPdc} onChange={(e) => updateStudentRow(idx, "projectNameAndPdc", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.achievements} onChange={(e) => updateStudentRow(idx, "achievements", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.completionDate} onChange={(e) => updateStudentRow(idx, "completionDate", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.resignationDate} onChange={(e) => updateStudentRow(idx, "resignationDate", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                              <td style={{ border: "1px solid #000", padding: "3px 4px" }}>
+                                <input type="text" value={s.remarks} onChange={(e) => updateStudentRow(idx, "remarks", e.target.value)} style={{ border: "1px dashed #ccc", width: "100%", fontSize: "11px", boxSizing: "border-box" }} />
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="14" style={{ textAlign: "center", padding: "12px", border: "1px solid #000" }}>No approved Paid student records found.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>

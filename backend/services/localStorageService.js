@@ -17,6 +17,8 @@ function matchesCondition(value, condition) {
       if (operator === "$regex") return new RegExp(expected, condition.$options || "").test(String(value || ""));
       if (operator === "$options") return true;
       if (operator === "$gte") return new Date(value).getTime() >= new Date(expected).getTime();
+      if (operator === "$lte") return new Date(value).getTime() <= new Date(expected).getTime();
+      if (operator === "$gt") return new Date(value).getTime() > new Date(expected).getTime();
       if (operator === "$lt") return new Date(value).getTime() < new Date(expected).getTime();
       return false;
     });

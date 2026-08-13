@@ -411,7 +411,7 @@
   "paidSeatLimit": 100,
   "unpaidSeatLimit": 150,
   "totalSeatLimit": 250,
-  "proformaQuarterEnding": "",
+  "proformaQuarterEnding": "01 Nov 2026",
   "proformaSection1": {
     "B_lab": "",
     "B_remark": "",
@@ -423,5 +423,30 @@
     "E_remark": "",
     "F_lab": "",
     "F_remark": ""
+  },
+  "proformaSelectedPeriod": {
+    "fromDate": "2026-08-01",
+    "toDate": "2026-11-01"
+  },
+  "attendanceSelectedPeriod": {
+    "fromDate": "2026-08-01",
+    "toDate": "2026-11-01"
+  },
+  "proformas": {
+    "2026-08-01_2026-11-01": {
+      "proformaQuarterEnding": "01 Nov 2026",
+      "proformaSection1": {
+        "B_lab": "",
+        "B_remark": "",
+        "C_lab": "",
+        "C_remark": "",
+        "D_lab": "",
+        "D_remark": "",
+        "E_lab": "",
+        "E_remark": "",
+        "F_lab": "",
+        "F_remark": ""
+      }
+    }
   }
 }
