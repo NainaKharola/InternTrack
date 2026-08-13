@@ -134,6 +134,19 @@ export async function saveTrainingManagement(id, payload) {
   return parseResponse(response);
 }
 
+export async function saveProformaConfig(payload) {
+  const response = await fetch(`${API_URL}/administration/proforma`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse(response);
+}
+
 export async function fetchCertificateStudents(date = "", endpoint = "certificates") {
   const params = date ? `?date=${encodeURIComponent(date)}` : "";
   const response = await fetch(`${API_URL}/${endpoint}/students${params}`, {

@@ -1,5 +1,5 @@
 {
-  "totalAllocatedSeats": 200,
+  "totalAllocatedSeats": 250,
   "divisions": [
     "ABS",
     "AI",
@@ -408,7 +408,20 @@
       "branchSeats": {}
     }
   },
-  "paidSeatLimit": 50,
+  "paidSeatLimit": 100,
   "unpaidSeatLimit": 150,
-  "totalSeatLimit": 200
+  "totalSeatLimit": 250,
+  "proformaQuarterEnding": "",
+  "proformaSection1": {
+    "B_lab": "",
+    "B_remark": "",
+    "C_lab": "",
+    "C_remark": "",
+    "D_lab": "",
+    "D_remark": "",
+    "E_lab": "",
+    "E_remark": "",
+    "F_lab": "",
+    "F_remark": ""
+  }
 }

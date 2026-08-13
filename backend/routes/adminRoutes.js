@@ -37,7 +37,7 @@ const { protectAdmin, requireMainAdmin } = require("../middleware/adminAuth");
 const { ensureApprovedStudent } = require("../middleware/ensureApprovedStudent");
 const { uploadOfferLetter: uploadOfferLetterFile } = require("../middleware/offerLetterUpload");
 const createGyapanRouter = require("./gyapanRoutes");
-const { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations } = require("../controllers/administrationController");
+const { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations, saveProformaConfig } = require("../controllers/administrationController");
 const { listColleges, createCollege, editCollege, removeCollege } = require("../controllers/collegeController");
 const managementController = require("../controllers/managementController");
 
@@ -70,6 +70,7 @@ router.delete("/administration/divisions/:name", protectAdmin, deleteDivision);
 router.patch("/administration/seats", protectAdmin, updateSeats);
 router.get("/administration/division-configurations", protectAdmin, getDivisionConfigurations);
 router.put("/administration/division-configurations", protectAdmin, saveDivisionConfigurations);
+router.patch("/administration/proforma", protectAdmin, saveProformaConfig);
 router.get("/colleges", protectAdmin, listColleges);
 router.post("/colleges", protectAdmin, createCollege);
 router.patch("/colleges/:id", protectAdmin, editCollege);

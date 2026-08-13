@@ -97,6 +97,20 @@ function FilterBar({ filters, onChange, students }) {
           ))}
         </select>
       </label>
+
+      {window.location.pathname.startsWith("/admin/approved-students") && (
+        <label className="admin-field">
+          <span>Resignation</span>
+          <select
+            value={filters.resignation || ""}
+            onChange={(event) => updateFilter("resignation", event.target.value)}
+          >
+            <option value="">All</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </label>
+      )}
     </section>
   );
 }

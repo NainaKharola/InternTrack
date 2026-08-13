@@ -133,7 +133,7 @@ function validateStepTwo(form) {
   ];
 
   const requiredFields = [
-    "internshipDuration",
+    ...(form.internshipType === "Paid" ? [] : ["internshipDuration"]),
     "internshipJoiningMonth",
     "permissionLetterNumber",
     "permissionLetterDate",
@@ -177,10 +177,14 @@ function validateStepTwo(form) {
 }
 
 function StudentForm({ embedded = false, onClose, defaultInternshipType }) {
-  const [form, setForm] = useState(() => ({
-    ...initialForm,
-    internshipType: defaultInternshipType || (window.location.pathname.includes("paid-internship") ? "Paid" : "Unpaid")
-  }));
+  const [form, setForm] = useState(() => {
+    const isPaid = (defaultInternshipType || (window.location.pathname.includes("paid-internship") ? "Paid" : "Unpaid")) === "Paid";
+    return {
+      ...initialForm,
+      internshipType: isPaid ? "Paid" : "Unpaid",
+      internshipDuration: isPaid ? "6 Months" : initialForm.internshipDuration
+    };
+  });
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);

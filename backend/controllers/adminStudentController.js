@@ -92,6 +92,14 @@ function buildStudentFilter(query) {
   if (query.branch) filter.branch = query.branch;
   if (query.year) filter.year = query.year;
 
+  if (query.resignation === "Yes") {
+    filter.resignationStatus = "Yes";
+  } else if (query.resignation === "No") {
+    conditions.push({
+      $or: [{ resignationStatus: "No" }, { resignationStatus: { $exists: false } }],
+    });
+  }
+
   const isApprovedView = query.isApprovedView === "true";
 
   if (isApprovedView) {
@@ -413,7 +421,7 @@ async function updateStudentReview(req, res) {
       });
     }
 
-    if (!allowedStatuses.includes(req.body.status)) {
+    if (req.body.status !== undefined && !allowedStatuses.includes(req.body.status)) {
       return res.status(400).json({
         success: false,
         message: "Select a valid status.",
@@ -424,7 +432,9 @@ async function updateStudentReview(req, res) {
     const oldStatus = student.status;
 
     reviewFields.forEach((field) => {
-      student[field] = req.body[field] || "";
+      if (req.body[field] !== undefined) {
+        student[field] = req.body[field];
+      }
     });
 
     student.reviewedBy = req.admin.email;
@@ -602,13 +612,13 @@ async function saveTrainingManagement(req, res) {
       branch: req.body.branch || student.branch,
       collegeName: req.body.collegeName || student.collegeName,
       collegeLocation: req.body.collegeLocation || student.location,
-      trainingDuration: req.body.trainingDuration || student.internshipDuration,
+      trainingDuration: req.body.trainingDuration || student.internshipDuration || (student.internshipType === "Paid" ? "6 Months" : ""),
       fromDate: req.body.fromDate || "",
       toDate:
         req.body.toDate ||
         addDurationToDate(
           req.body.fromDate,
-          req.body.trainingDuration || student.internshipDuration,
+          req.body.trainingDuration || student.internshipDuration || (student.internshipType === "Paid" ? "6 Months" : ""),
         ),
       joined: req.body.joined || "",
       division,
@@ -946,6 +956,39 @@ async function updateStudentDetails(req, res) {
     if (body.permissionLetterNumber !== undefined) student.permissionLetterNumber = body.permissionLetterNumber;
     if (body.permissionLetterDate !== undefined) student.permissionLetterDate = body.permissionLetterDate;
     if (body.internshipJoiningMonth !== undefined) student.internshipJoiningMonth = body.internshipJoiningMonth;
+
+    if (body.resignationStatus !== undefined) student.resignationStatus = body.resignationStatus;
+    if (body.resignationDate !== undefined) student.resignationDate = body.resignationDate;
+    if (body.paidInternshipProjectDetails !== undefined) {
+      student.paidInternshipProjectDetails = {
+        ...student.paidInternshipProjectDetails,
+        ...body.paidInternshipProjectDetails
+      };
+    }
+    if (body.bankDetails !== undefined) {
+      student.bankDetails = {
+        ...student.bankDetails,
+        ...body.bankDetails
+      };
+    }
+    if (body.firstQuarterReport !== undefined) {
+      student.firstQuarterReport = {
+        ...student.firstQuarterReport,
+        ...body.firstQuarterReport
+      };
+    }
+    if (body.secondQuarterReport !== undefined) {
+      student.secondQuarterReport = {
+        ...student.secondQuarterReport,
+        ...body.secondQuarterReport
+      };
+    }
+    if (body.trainingManagement !== undefined) {
+      student.trainingManagement = {
+        ...student.trainingManagement,
+        ...body.trainingManagement
+      };
+    }
 
     // Handle document file replacements
     const filesToReplace = ["resume", "result", "photo", "permissionLetter"];

@@ -199,4 +199,26 @@ async function saveDivisionConfigurations(req, res, next) {
   }
 }
 
-module.exports = { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations };
+async function saveProformaConfig(req, res, next) {
+  try {
+    const { proformaQuarterEnding, proformaSection1 } = req.body;
+    const administration = await getAdministration();
+
+    if (proformaQuarterEnding !== undefined) {
+      administration.proformaQuarterEnding = proformaQuarterEnding;
+    }
+    if (proformaSection1 !== undefined) {
+      administration.proformaSection1 = {
+        ...administration.proformaSection1,
+        ...proformaSection1
+      };
+    }
+
+    await saveAdministration(administration);
+    res.json({ success: true, message: "Proforma configuration saved successfully.", administration });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations, saveProformaConfig };

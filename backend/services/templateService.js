@@ -56,13 +56,16 @@ function buildTemplateData(student, overrides = {}) {
     student.offerLetter?.issueDate ||
     new Date();
 
-  const duration =
+  let duration =
     overrides.internshipDuration ||
     overrides.duration ||
     student.trainingManagement?.trainingDuration ||
     student.offerLetter?.internshipDuration ||
     student.internshipDuration ||
     "";
+  if (!duration && student.internshipType === "Paid") {
+    duration = "6 Months";
+  }
 
   return {
     logoUrl: overrides.logoUrl || logoBase64,

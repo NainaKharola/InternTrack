@@ -52,7 +52,8 @@ function isValidDateValue(value) {
 }
 
 function validateRequest(body, files) {
-  const missingFields = requiredFields.filter(
+  const fields = requiredFields.filter(f => !(body.internshipType === "Paid" && f === "internshipDuration"));
+  const missingFields = fields.filter(
     (field) => !String(body[field] || "").trim()
   );
 
@@ -279,7 +280,7 @@ async function createStudent(req, res) {
 
       collegeId: req.body.collegeId,
 
-      internshipDuration: req.body.internshipDuration,
+      internshipDuration: (req.body.internshipType === "Paid") ? (req.body.internshipDuration || "6 Months") : req.body.internshipDuration,
       internshipJoiningDate: req.body.internshipJoiningDate || "",
       internshipJoiningMonth: req.body.internshipJoiningMonth,
 

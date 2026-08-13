@@ -12,15 +12,17 @@ function DocumentForm({ form, errors, onChange }) {
       <section className="form-section">
         <h2>Internship Details</h2>
         <div className="form-grid">
-          <SelectInput
-            label="Internship Duration"
-            name="internshipDuration"
-            value={form.internshipDuration}
-            onChange={onChange}
-            options={sortDurations(internshipDurations)}
-            error={errors.internshipDuration}
-            required
-          />
+          {form.internshipType !== "Paid" && (
+            <SelectInput
+              label="Internship Duration"
+              name="internshipDuration"
+              value={form.internshipDuration}
+              onChange={onChange}
+              options={sortDurations(internshipDurations)}
+              error={errors.internshipDuration}
+              required
+            />
+          )}
           <TextInput
             label="Joining Month"
             name="internshipJoiningMonth"

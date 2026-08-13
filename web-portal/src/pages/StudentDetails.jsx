@@ -890,9 +890,17 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
         <div className="administration-toast administration-toast--error" style={{ marginBottom: "16px" }} role="alert">
           {editError}
         </div>
-      )}
-
-
+      )}      <DetailGrid
+        title="Personal Details"
+        rows={[
+          ["Name", student.name || "Not Provided"],
+          ["Gender", student.gender || "Not Provided"],
+          ["Date of Birth", student.dob || "Not Provided"],
+          ["Phone Number", student.phone || "Not Provided"],
+          ["Email", student.email || "Not Provided"],
+          ["Aadhaar Number", student.aadhaarNumber || "Not Provided"],
+        ]}
+      />
 
       {!isApprovedView && (isEditing ? (
         <section className="details-section">

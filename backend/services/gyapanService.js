@@ -58,8 +58,9 @@ function buildStudentRows(rows) {
             <div style="display:flex; gap:16px;">
               <strong>${escapeHtml(row.studentName)}</strong>
               <strong>${escapeHtml(row.courseYear)}</strong>
+              <strong>${escapeHtml(row.course)}</strong>
             </div>
-            <div style="margin-top:8px;">${escapeHtml(row.branch || row.course)}</div>
+            <div style="margin-top:8px;">${escapeHtml(row.branch)}</div>
           </td>
 
           <td>

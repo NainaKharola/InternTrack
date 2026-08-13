@@ -12,6 +12,8 @@ import {
   updateStudentReview,
   setupRecoveryInfo,
   downloadAttendanceReportPdf,
+  fetchAdministration,
+  saveProformaConfig,
 } from "../services/adminService";
 import { createGyapanPreview, generateGyapanPdf } from "../services/gyapanService";
 import { downloadOfferLetterPdf } from "../services/offerLetterService";
@@ -55,6 +57,7 @@ const initialFilters = {
   registrationDate: "",
   division: "",
   internshipType: "",
+  resignation: "",
 };
 const CERTIFICATE_DOWNLOADS_KEY = "drdoCertificateDownloadedStudentIds";
 const ISM_DOWNLOADS_KEY = "drdoIsmDownloadedStudentIds";
@@ -138,6 +141,7 @@ function AdminDashboard() {
   const [students, setStudents] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [summary, setSummary] = useState({});
+  const [administration, setAdministration] = useState(null);
   const [search, setSearch] = useState(() => {
     const path = window.location.pathname;
     if (path.startsWith("/admin/approved-students")) {
@@ -189,7 +193,7 @@ function AdminDashboard() {
   useEffect(() => {
     if (quarterlySubView === "proforma" && allStudents.length > 0) {
       const approvedPaid = allStudents.filter(
-        (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
+        (s) => s.status === "Approved" && s.internshipType === "Paid"
       );
       const mapped = approvedPaid.map((student) => {
         const project = student.paidInternshipProjectDetails || {};
@@ -308,15 +312,33 @@ function AdminDashboard() {
   // Load all students for local search/filters/options in Student Management
   const loadAll = async () => {
     try {
-      const response = await fetchAdminStudents({
-        sortBy: "submittedAt",
-        sortOrder: "desc",
-      });
+      const [response, adminResponse] = await Promise.all([
+        fetchAdminStudents({
+          sortBy: "submittedAt",
+          sortOrder: "desc",
+        }),
+        fetchAdministration()
+      ]);
       setAllStudents(response.students);
+      setAdministration(adminResponse.administration);
     } catch {
       setAllStudents([]);
     }
   };
+
+  useEffect(() => {
+    if (administration) {
+      if (administration.proformaQuarterEnding) {
+        setProformaQuarterEnding(administration.proformaQuarterEnding);
+      }
+      if (administration.proformaSection1) {
+        setProformaSection1((prev) => ({
+          ...prev,
+          ...administration.proformaSection1
+        }));
+      }
+    }
+  }, [administration]);
 
   useEffect(() => {
     loadAll();
@@ -796,9 +818,7 @@ function AdminDashboard() {
   }, [documentIndex, documentQueue, allStudents]);
 
   const getProformaHtml = useCallback((forExport = false) => {
-    const approvedPaidCount = allStudents.filter(
-      (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
-    ).length;
+    const approvedPaidCount = administration?.paidSeatLimit ?? 0;
 
     const rowsHtml = proformaStudents
       .map((s, index) => {
@@ -988,20 +1008,20 @@ function AdminDashboard() {
                 <th>Remarks</th>
             </tr>
             <tr class="center">
-                <td style="mso-number-format:'\\@';"></td>
-                <td style="mso-number-format:'\\@';">(1)</td>
-                <td style="mso-number-format:'\\@';">(2)</td>
-                <td style="mso-number-format:'\\@';">(3)</td>
-                <td style="mso-number-format:'\\@';">(4)</td>
-                <td style="mso-number-format:'\\@';">(5)</td>
-                <td style="mso-number-format:'\\@';">(6)</td>
-                <td style="mso-number-format:'\\@';">(7)</td>
-                <td style="mso-number-format:'\\@';">(8)</td>
-                <td style="mso-number-format:'\\@';">(9)</td>
-                <td style="mso-number-format:'\\@';">(10)</td>
-                <td style="mso-number-format:'\\@';">(11)</td>
-                <td style="mso-number-format:'\\@';">(12)</td>
-                <td style="mso-number-format:'\\@';">(13)</td>
+                <td style="mso-number-format:\@;"></td>
+                <td style="mso-number-format:\@;">&nbsp;(1)</td>
+                <td style="mso-number-format:\@;">&nbsp;(2)</td>
+                <td style="mso-number-format:\@;">&nbsp;(3)</td>
+                <td style="mso-number-format:\@;">&nbsp;(4)</td>
+                <td style="mso-number-format:\@;">&nbsp;(5)</td>
+                <td style="mso-number-format:\@;">&nbsp;(6)</td>
+                <td style="mso-number-format:\@;">&nbsp;(7)</td>
+                <td style="mso-number-format:\@;">&nbsp;(8)</td>
+                <td style="mso-number-format:\@;">&nbsp;(9)</td>
+                <td style="mso-number-format:\@;">&nbsp;(10)</td>
+                <td style="mso-number-format:\@;">&nbsp;(11)</td>
+                <td style="mso-number-format:\@;">&nbsp;(12)</td>
+                <td style="mso-number-format:\@;">&nbsp;(13)</td>
             </tr>
         </thead>
         <tbody>
@@ -1011,7 +1031,7 @@ function AdminDashboard() {
 
 </body>
 </html>`;
-  }, [allStudents, proformaQuarterEnding, proformaSection1, proformaStudents]);
+  }, [allStudents, proformaQuarterEnding, proformaSection1, proformaStudents, administration]);
 
   const downloadProformaExcel = useCallback(() => {
     const htmlContent = getProformaHtml(true);
@@ -1041,7 +1061,7 @@ function AdminDashboard() {
 
   const getAttendanceReportHtml = useCallback((quarter) => {
     const approvedPaidStudents = allStudents.filter(
-      (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
+      (s) => s.status === "Approved" && s.internshipType === "Paid"
     );
 
     const rowsHtml = approvedPaidStudents
@@ -1155,7 +1175,7 @@ function AdminDashboard() {
 
   const downloadExcel = useCallback((quarter) => {
     const approvedPaidStudents = allStudents.filter(
-      (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
+      (s) => s.status === "Approved" && s.internshipType === "Paid"
     );
     const headers = ["SRNO", "STUDENT NAME", "PERIOD", "No. of Present (DAYS)", "BANK NAME", "Saving A/c no", "IFSC"];
     const rows = approvedPaidStudents.map((student, index) => {
@@ -1229,9 +1249,153 @@ function AdminDashboard() {
     });
   };
 
+  const [isSavingProforma, setIsSavingProforma] = useState(false);
+
+  const saveProformaChanges = async () => {
+    setIsSavingProforma(true);
+    try {
+      const parseDateInput = (val) => {
+        if (!val || val === "-" || String(val).trim() === "") return null;
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) {
+          const [d, m, y] = val.split("/");
+          return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+          return val;
+        }
+        const parsed = new Date(val);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString().slice(0, 10);
+        }
+        return val;
+      };
+
+      for (const s of proformaStudents) {
+        let course = s.discipline || "";
+        let branch = "";
+        if (s.discipline && s.discipline.includes(" - ")) {
+          const parts = s.discipline.split(" - ");
+          course = parts[0].trim();
+          branch = parts.slice(1).join(" - ").trim();
+        }
+
+        const payload = {
+          name: s.name,
+          gender: s.gender,
+          course,
+          branch,
+          dob: parseDateInput(s.dob),
+          trainingManagement: {
+            fromDate: parseDateInput(s.joiningDate),
+            toDate: parseDateInput(s.completionDate),
+            remarks: s.remarks,
+          },
+          paidInternshipProjectDetails: {
+            projectName: s.projectName,
+            designationTitle: s.designationTitle,
+            supervisorName: s.supervisorName,
+            projectNameAndPdc: s.projectNameAndPdc,
+            achievements: s.achievements,
+          }
+        };
+
+        if (s.resignationDate && s.resignationDate !== "-") {
+          payload.resignationStatus = "Yes";
+          payload.resignationDate = parseDateInput(s.resignationDate);
+        } else {
+          payload.resignationStatus = "No";
+          payload.resignationDate = null;
+        }
+
+        await updateStudentReview(s._id, payload);
+      }
+      
+      await saveProformaConfig({
+        proformaQuarterEnding,
+        proformaSection1
+      });
+      
+      alert("Proforma changes saved successfully!");
+      await loadAll();
+    } catch (err) {
+      alert("Failed to save changes: " + err.message);
+    } finally {
+      setIsSavingProforma(false);
+    }
+  };
+
+  const updateAttendanceStudent = (studentId, field, value, quarter) => {
+    setAllStudents((prev) =>
+      prev.map((s) => {
+        if (s._id !== studentId) return s;
+        const updated = { ...s };
+        if (field === "bankName" || field === "savingAccountNumber" || field === "ifsc") {
+          updated.bankDetails = {
+            ...(updated.bankDetails || {}),
+            [field]: value
+          };
+        } else if (field === "fromDate" || field === "toDate" || field === "daysPresent") {
+          const reportKey = quarter === 1 ? "firstQuarterReport" : "secondQuarterReport";
+          updated[reportKey] = {
+            ...(updated[reportKey] || {}),
+            [field]: value
+          };
+        }
+        return updated;
+      })
+    );
+  };
+
+  const saveAttendanceChanges = async (quarter) => {
+    setIsSavingProforma(true);
+    try {
+      const approvedPaidStudents = allStudents.filter(
+        (s) => s.status === "Approved" && s.internshipType === "Paid"
+      );
+
+      const parseDateInput = (val) => {
+        if (!val || val === "-" || String(val).trim() === "") return "";
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) {
+          const [d, m, y] = val.split("/");
+          return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+          return val;
+        }
+        const parsed = new Date(val);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString().slice(0, 10);
+        }
+        return val;
+      };
+
+      for (const s of approvedPaidStudents) {
+        const report = quarter === 1 ? s.firstQuarterReport : s.secondQuarterReport;
+        const reportKey = quarter === 1 ? "firstQuarterReport" : "secondQuarterReport";
+
+        const payload = {
+          bankDetails: s.bankDetails || {},
+          [reportKey]: {
+            fromDate: parseDateInput(report?.fromDate),
+            toDate: parseDateInput(report?.toDate),
+            daysPresent: report?.daysPresent || "",
+          }
+        };
+
+        await updateStudentReview(s._id, payload);
+      }
+      alert("Attendance changes saved successfully!");
+      await loadAll();
+    } catch (err) {
+      alert("Failed to save changes: " + err.message);
+    } finally {
+      setIsSavingProforma(false);
+    }
+  };
+
   const renderQuarterTable = (quarter) => {
     const approvedPaidStudents = allStudents.filter(
-      (s) => s.status === "Approved" && s.internshipType === "Paid" && s.completedStatus !== "Yes"
+      (s) => s.status === "Approved" && s.internshipType === "Paid"
     );
 
     return (
@@ -1255,20 +1419,61 @@ function AdminDashboard() {
                 approvedPaidStudents.map((student, index) => {
                   const report = quarter === 1 ? student.firstQuarterReport : student.secondQuarterReport;
                   const bank = student.bankDetails || {};
-                  let period = "-";
-                  if (report?.fromDate && report?.toDate) {
-                    period = `${formatReportDate(report.fromDate)} - ${formatReportDate(report.toDate)}`;
-                  }
-                  const days = report?.daysPresent !== undefined && report?.daysPresent !== "" ? report.daysPresent : "-";
                   return (
                     <tr key={student._id}>
                       <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>{index + 1}</td>
                       <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>{student.name}</td>
-                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>{period}</td>
-                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>{days}</td>
-                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>{bank.bankName || "-"}</td>
-                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>{bank.savingAccountNumber || "-"}</td>
-                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>{bank.ifsc || "-"}</td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>
+                        <div style={{ display: "flex", gap: "4px", alignItems: "center", justifyContent: "center" }}>
+                          <input
+                            type="text"
+                            placeholder="From (YYYY-MM-DD)"
+                            value={report?.fromDate || ""}
+                            onChange={(e) => updateAttendanceStudent(student._id, "fromDate", e.target.value, quarter)}
+                            style={{ border: "1px dashed #ccc", padding: "2px", fontSize: "11px", width: "100px" }}
+                          />
+                          <span>-</span>
+                          <input
+                            type="text"
+                            placeholder="To (YYYY-MM-DD)"
+                            value={report?.toDate || ""}
+                            onChange={(e) => updateAttendanceStudent(student._id, "toDate", e.target.value, quarter)}
+                            style={{ border: "1px dashed #ccc", padding: "2px", fontSize: "11px", width: "100px" }}
+                          />
+                        </div>
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "center" }}>
+                        <input
+                          type="text"
+                          value={report?.daysPresent || ""}
+                          onChange={(e) => updateAttendanceStudent(student._id, "daysPresent", e.target.value, quarter)}
+                          style={{ border: "1px dashed #ccc", padding: "2px", fontSize: "11px", width: "60px", textAlign: "center" }}
+                        />
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>
+                        <input
+                          type="text"
+                          value={bank.bankName || ""}
+                          onChange={(e) => updateAttendanceStudent(student._id, "bankName", e.target.value, quarter)}
+                          style={{ border: "1px dashed #ccc", padding: "2px", fontSize: "11px", width: "100%" }}
+                        />
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>
+                        <input
+                          type="text"
+                          value={bank.savingAccountNumber || ""}
+                          onChange={(e) => updateAttendanceStudent(student._id, "savingAccountNumber", e.target.value, quarter)}
+                          style={{ border: "1px dashed #ccc", padding: "2px", fontSize: "11px", width: "100%" }}
+                        />
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "6px 8px", textAlign: "left" }}>
+                        <input
+                          type="text"
+                          value={bank.ifsc || ""}
+                          onChange={(e) => updateAttendanceStudent(student._id, "ifsc", e.target.value, quarter)}
+                          style={{ border: "1px dashed #ccc", padding: "2px", fontSize: "11px", width: "100%" }}
+                        />
+                      </td>
                     </tr>
                   );
                 })
@@ -1607,6 +1812,7 @@ function AdminDashboard() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                 <h2 style={{ margin: 0 }}>First Quarter Report</h2>
                 <div style={{ display: "flex", gap: "12px" }}>
+                  <button className="admin-primary-btn" type="button" onClick={() => saveAttendanceChanges(1)} disabled={isSavingProforma}>{isSavingProforma ? "Saving..." : "Save Changes"}</button>
                   <button className="admin-primary-btn" type="button" onClick={() => downloadExcel(1)}>Download Excel</button>
                   <button className="admin-primary-btn" type="button" onClick={() => handleDownloadPdf(1)}>Download PDF</button>
                   <button className="admin-primary-btn" type="button" onClick={() => handlePrint(1)}>Print</button>
@@ -1622,6 +1828,7 @@ function AdminDashboard() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                 <h2 style={{ margin: 0 }}>Second Quarter Report</h2>
                 <div style={{ display: "flex", gap: "12px" }}>
+                  <button className="admin-primary-btn" type="button" onClick={() => saveAttendanceChanges(2)} disabled={isSavingProforma}>{isSavingProforma ? "Saving..." : "Save Changes"}</button>
                   <button className="admin-primary-btn" type="button" onClick={() => downloadExcel(2)}>Download Excel</button>
                   <button className="admin-primary-btn" type="button" onClick={() => handleDownloadPdf(2)}>Download PDF</button>
                   <button className="admin-primary-btn" type="button" onClick={() => handlePrint(2)}>Print</button>
@@ -1637,6 +1844,7 @@ function AdminDashboard() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
                 <h2 style={{ margin: 0 }}>Proforma for Quarterly Report</h2>
                 <div style={{ display: "flex", gap: "12px" }}>
+                  <button className="admin-primary-btn" type="button" onClick={saveProformaChanges} disabled={isSavingProforma}>{isSavingProforma ? "Saving..." : "Save Changes"}</button>
                   <button className="admin-primary-btn" type="button" onClick={downloadProformaExcel}>Download Excel</button>
                   <button className="admin-primary-btn" type="button" onClick={handleProformaPrint}>Print</button>
                   <button className="admin-secondary-btn" type="button" onClick={() => setQuarterlySubView("menu")}>Back</button>
@@ -1676,7 +1884,7 @@ function AdminDashboard() {
                     <tr>
                       <td colSpan="4" style={{ border: "1px solid #000", padding: "3px 4px" }}>A</td>
                       <td style={{ border: "1px solid #000", padding: "3px 4px" }}>Authorization of Intern:</td>
-                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>Total students = {proformaStudents.length}</td>
+                      <td style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>Total students = {administration?.paidSeatLimit ?? 0}</td>
                       <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px", textAlign: "center" }}>IRDE</td>
                       <td colSpan="2" style={{ border: "1px solid #000", padding: "3px 4px" }}></td>
                     </tr>
