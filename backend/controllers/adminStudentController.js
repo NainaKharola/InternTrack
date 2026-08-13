@@ -437,11 +437,77 @@ async function updateStudentReview(req, res) {
       }
     });
 
+    if (req.body.name !== undefined) student.name = req.body.name;
+    if (req.body.gender !== undefined) student.gender = req.body.gender;
+    if (req.body.course !== undefined) student.course = req.body.course;
+    if (req.body.branch !== undefined) student.branch = req.body.branch;
+    if (req.body.dob !== undefined) student.dob = req.body.dob;
+    
+    if (req.body.internshipDuration !== undefined) student.internshipDuration = req.body.internshipDuration;
+    if (req.body.permissionLetterNumber !== undefined) student.permissionLetterNumber = req.body.permissionLetterNumber;
+    if (req.body.permissionLetterDate !== undefined) student.permissionLetterDate = req.body.permissionLetterDate;
+    if (req.body.internshipJoiningMonth !== undefined) student.internshipJoiningMonth = req.body.internshipJoiningMonth;
+
+    if (req.body.resignationStatus !== undefined) student.resignationStatus = req.body.resignationStatus;
+    if (req.body.resignationDate !== undefined) student.resignationDate = req.body.resignationDate;
+    if (req.body.paidInternshipProjectDetails !== undefined) {
+      student.paidInternshipProjectDetails = {
+        ...student.paidInternshipProjectDetails,
+        ...req.body.paidInternshipProjectDetails
+      };
+    }
+    if (req.body.bankDetails !== undefined) {
+      student.bankDetails = {
+        ...student.bankDetails,
+        ...req.body.bankDetails
+      };
+    }
+    if (req.body.firstQuarterReport !== undefined) {
+      student.firstQuarterReport = {
+        ...student.firstQuarterReport,
+        ...req.body.firstQuarterReport
+      };
+    }
+    if (req.body.secondQuarterReport !== undefined) {
+      student.secondQuarterReport = {
+        ...student.secondQuarterReport,
+        ...req.body.secondQuarterReport
+      };
+    }
+    if (req.body.trainingManagement !== undefined) {
+      student.trainingManagement = {
+        ...student.trainingManagement,
+        ...req.body.trainingManagement
+      };
+    }
+
     student.reviewedBy = req.admin.email;
     student.reviewedAt = new Date();
 
     if (student.status === "Approved" && !student.approvedDate) {
       student.approvedDate = new Date();
+    }
+
+    if (student.trainingManagement) {
+      student.trainingManagement.studentName = student.name;
+      student.trainingManagement.courseName = student.course;
+      student.trainingManagement.courseYear = student.year;
+      student.trainingManagement.branch = student.branch;
+      student.trainingManagement.collegeName = student.collegeName;
+      student.trainingManagement.collegeLocation = student.location;
+      student.trainingManagement.trainingDuration = student.internshipDuration;
+      student.trainingManagement.collegeAddress = student.collegeAddress;
+    }
+
+    if (student.offerLetter) {
+      student.offerLetter.studentName = student.name;
+      student.offerLetter.course = student.course;
+      student.offerLetter.year = student.year;
+      student.offerLetter.branch = student.branch;
+      student.offerLetter.collegeName = student.collegeName;
+      student.offerLetter.collegeLocation = student.location;
+      student.offerLetter.internshipDuration = student.internshipDuration;
+      student.offerLetter.collegeAddress = student.collegeAddress;
     }
 
     await student.save();
