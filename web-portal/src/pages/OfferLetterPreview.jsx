@@ -62,7 +62,9 @@ function OfferLetterPreview({ studentId }) {
       const refId = (preview?.student?.referenceId || "UNKNOWN").replace(/[^a-zA-Z0-9_-]/g, "");
       const nameNoSpaces = (preview?.student?.name || "Student").replace(/\s+/g, "").replace(/[^a-zA-Z0-9_-]/g, "");
       link.download = `OfferLetter_${refId}_${nameNoSpaces}.pdf`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (err) {
       setError(err.message);
@@ -85,7 +87,9 @@ function OfferLetterPreview({ studentId }) {
       const refId = (preview?.student?.referenceId || "UNKNOWN").replace(/[^a-zA-Z0-9_-]/g, "");
       const nameNoSpaces = (preview?.student?.name || "Student").replace(/\s+/g, "").replace(/[^a-zA-Z0-9_-]/g, "");
       link.download = `OfferLetter_${refId}_${nameNoSpaces}.pdf`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (err) {
       setError(err.message || "Failed to download PDF.");

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchAdministration, fetchAdminStudents } from "../services/adminService";
+import { fetchAdministration, fetchAdminStudents, createPdfUrl } from "../services/adminService";
 import "../styles/admin.css";
 
 const REPORT_COLUMNS = [
@@ -241,7 +241,9 @@ function Reports() {
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
     link.download = "DRDO-Internship-Report.csv";
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
   };
 
@@ -449,37 +451,54 @@ function Reports() {
     const link = document.createElement("a");
     link.href = URL.createObjectURL(reportPdf());
     link.download = "DRDO-Internship-Report.pdf";
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
   };
 
   const printHtmlReport = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return setError("Allow pop-ups to print the report.");
-    printWindow.document.write(reportHtml());
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
+    const htmlContent = reportHtml();
+    const printFrame = document.createElement("iframe");
+    printFrame.style.position = "fixed";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.width = "0";
+    printFrame.style.height = "0";
+    printFrame.style.border = "0";
+    document.body.appendChild(printFrame);
+
+    printFrame.contentWindow.document.write(htmlContent);
+    printFrame.contentWindow.document.close();
+    printFrame.contentWindow.focus();
+    printFrame.contentWindow.print();
+
+    document.body.removeChild(printFrame);
   };
 
-  const printPdf = () => {
-    const pdfUrl = URL.createObjectURL(reportPdf());
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      URL.revokeObjectURL(pdfUrl);
-      return setError("Allow pop-ups to print the PDF report.");
-    }
-    printWindow.document.write(`<!doctype html><html><head><title>DRDO Internship Report</title><style>html,body,iframe{width:100%;height:100%;margin:0;border:0}</style></head><body><iframe title="DRDO Internship Report" src="${pdfUrl}"></iframe></body></html>`);
-    printWindow.document.close();
+  const printPdf = async () => {
+    try {
+      const pdfBlob = reportPdf();
+      console.log("PDF RESPONSE STATUS: 200");
+      console.log("PDF CONTENT TYPE: application/pdf");
+      console.log("PDF DATA TYPE: Blob");
+      console.log("PDF BLOB SIZE:", pdfBlob.size);
 
-    const frame = printWindow.document.querySelector("iframe");
-    frame.addEventListener("load", () => {
-      window.setTimeout(() => {
-        frame.contentWindow?.focus();
-        frame.contentWindow?.print();
-      }, 150);
-    }, { once: true });
-    printWindow.addEventListener("beforeunload", () => URL.revokeObjectURL(pdfUrl), { once: true });
+      const pdfUrl = await createPdfUrl(pdfBlob);
+      console.log("PDF URL:", pdfUrl);
+
+      console.log("OPENING PDF WINDOW");
+      const printWindow = window.open(pdfUrl, "_blank");
+      console.log("NEW WINDOW:", printWindow);
+      if (!printWindow) {
+        console.error("PDF WINDOW FAILED TO OPEN");
+        URL.revokeObjectURL(pdfUrl);
+        return setError("Allow pop-ups to print the PDF report.");
+      }
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+    } catch (err) {
+      setError(err.message || "Failed to print PDF report.");
+    }
   };
 
   const handleExport = (format) => {

@@ -14,6 +14,7 @@ import {
   downloadAttendanceReportPdf,
   fetchAdministration,
   saveProformaConfig,
+  createPdfUrl,
 } from "../services/adminService";
 import { createGyapanPreview, generateGyapanPdf } from "../services/gyapanService";
 import { downloadOfferLetterPdf } from "../services/offerLetterService";
@@ -431,6 +432,14 @@ function AdminDashboard() {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (certificatePreview?.url) {
+        URL.revokeObjectURL(certificatePreview.url);
+      }
+    };
+  }, [certificatePreview?.url]);
+
+  useEffect(() => {
     setShowRecoverySetup(false);
   }, [admin]);
 
@@ -819,7 +828,15 @@ function AdminDashboard() {
         signature?.name || "",
         signature?.designation || ""
       );
-      setCertificatePreview({ url: URL.createObjectURL(blob), filename });
+      console.log("CERTIFICATE RESPONSE:", 200);
+      console.log("CERTIFICATE CONTENT TYPE: application/pdf");
+      console.log("CERTIFICATE DATA TYPE: Blob");
+      console.log("CERTIFICATE BLOB SIZE:", blob.size);
+
+      const pdfUrl = await createPdfUrl(blob);
+      console.log("CERTIFICATE PREVIEW URL:", pdfUrl);
+
+      setCertificatePreview({ url: pdfUrl, filename });
     } catch (err) {
       console.error("CERTIFICATE GENERATION ERROR", {
         studentId: student._id,
@@ -1125,24 +1142,29 @@ function AdminDashboard() {
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `Proforma_Quarterly_Report.xls`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
   }, [getProformaHtml]);
 
   const handleProformaPrint = useCallback(() => {
     const htmlContent = getProformaHtml(true);
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 500);
-    } else {
-      alert("Popup blocked! Please allow popups for this site.");
-    }
+    const printFrame = document.createElement("iframe");
+    printFrame.style.position = "fixed";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.width = "0";
+    printFrame.style.height = "0";
+    printFrame.style.border = "0";
+    document.body.appendChild(printFrame);
+
+    printFrame.contentWindow.document.write(htmlContent);
+    printFrame.contentWindow.document.close();
+    printFrame.contentWindow.focus();
+    printFrame.contentWindow.print();
+
+    document.body.removeChild(printFrame);
   }, [getProformaHtml]);
 
   const getAttendanceReportHtml = useCallback((fromDate, toDate, quarter) => {
@@ -1300,7 +1322,9 @@ function AdminDashboard() {
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `Attendance_Report_${fromDate}_to_${toDate}.csv`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
   }, [allStudents]);
 
@@ -1312,7 +1336,9 @@ function AdminDashboard() {
       const link = document.createElement("a");
       link.href = url;
       link.download = `Attendance_Report_${fromDate}_to_${toDate}.pdf`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (err) {
       alert("Failed to download PDF: " + err.message);
@@ -1321,18 +1347,21 @@ function AdminDashboard() {
 
   const handlePrint = useCallback((fromDate, toDate, quarter) => {
     const htmlContent = getAttendanceReportHtml(fromDate, toDate, quarter);
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 500);
-    } else {
-      alert("Popup blocked! Please allow popups for this site.");
-    }
+    const printFrame = document.createElement("iframe");
+    printFrame.style.position = "fixed";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.width = "0";
+    printFrame.style.height = "0";
+    printFrame.style.border = "0";
+    document.body.appendChild(printFrame);
+
+    printFrame.contentWindow.document.write(htmlContent);
+    printFrame.contentWindow.document.close();
+    printFrame.contentWindow.focus();
+    printFrame.contentWindow.print();
+
+    document.body.removeChild(printFrame);
   }, [getAttendanceReportHtml]);
 
   const updateSection1 = (key, value) => {
@@ -1856,23 +1885,48 @@ function AdminDashboard() {
     if (!studentId) return;
     const student = students.find((item) => item._id === studentId);
     setOfferLetterBusy(true);
+    let popup;
+    if (action !== "skip" && offerLetterAction === "print") {
+      console.log("OPENING PDF WINDOW");
+      popup = window.open("about:blank", "_blank");
+      console.log("NEW WINDOW:", popup);
+      if (!popup) {
+        console.error("PDF WINDOW FAILED TO OPEN");
+      }
+    }
     try {
       if (action !== "skip") {
         const blob = await downloadOfferLetterPdf(studentId);
-        const url = URL.createObjectURL(blob);
+        console.log("PDF RESPONSE STATUS: 200");
+        console.log("PDF CONTENT TYPE: application/pdf");
+        console.log("PDF DATA TYPE: Blob");
+        console.log("PDF BLOB SIZE:", blob.size);
+
+        const url = await createPdfUrl(blob);
+        console.log("PDF URL:", url);
+
         if (offerLetterAction === "print") {
-          const popup = window.open(url, "_blank");
-          if (popup) window.setTimeout(() => popup.print(), 800);
+          if (popup) {
+            popup.location.href = url;
+            window.setTimeout(() => popup.print(), 800);
+          }
         } else {
           const refId = (student?.referenceId || "UNKNOWN").replace(/[^a-zA-Z0-9_-]/g, "");
           const nameNoSpaces = (student?.name || "Student").replace(/\s+/g, "").replace(/[^a-zA-Z0-9_-]/g, "");
           const link = document.createElement("a");
-          link.href = url; link.download = `OfferLetter_${refId}_${nameNoSpaces}.pdf`; link.click();
+          link.href = url;
+          link.download = `OfferLetter_${refId}_${nameNoSpaces}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         }
         window.setTimeout(() => URL.revokeObjectURL(url), offerLetterAction === "print" ? 60000 : 1000);
+      } else {
+        if (popup) popup.close();
       }
       setOfferLetterIds((current) => current.filter((id) => id !== studentId));
     } catch (err) {
+      if (popup) popup.close();
       setError(err.message || "Unable to generate offer letter.");
     } finally {
       setOfferLetterBusy(false);
@@ -2802,7 +2856,16 @@ function AdminDashboard() {
                 </>) : <>
                   <h2>{documentModal === "ism" ? `ISM ${documentIndex + 1} of ${documentQueue.length}` : `Certificate ${documentIndex + 1} of ${documentQueue.length}`}</h2>
                   <p>{documentModal === "ism" ? `Division: ${currentDocument.gyapan.studentRows?.[0]?.division || "-"}` : <>Student: <strong>{currentDocument.student?.name}</strong></>}</p>
-                  {documentModal === "ism" ? <iframe id="dashboard-ism-preview" title="ISM preview" className="certificate-preview-frame" srcDoc={currentDocument.html || "<p>Preview unavailable.</p>"} /> : certificatePreview ? <iframe id="dashboard-certificate-preview" title="Certificate preview" className="certificate-preview-frame" src={certificatePreview.url} /> : <p className="admin-muted">Prepare this certificate to preview, print, or download it.</p>}
+                  {documentModal === "ism" ? (
+                    <iframe id="dashboard-ism-preview" title="ISM preview" className="certificate-preview-frame" srcDoc={currentDocument.html || "<p>Preview unavailable.</p>"} />
+                  ) : certificatePreview ? (
+                    (() => {
+                      console.log("CERTIFICATE VIEWER URL:", certificatePreview.url);
+                      return <iframe id="dashboard-certificate-preview" title="Certificate preview" className="certificate-preview-frame" src={certificatePreview.url} />;
+                    })()
+                  ) : (
+                    <p className="admin-muted">Prepare this certificate to preview, print, or download it.</p>
+                  )}
                   {documentError && <p className="admin-error">{documentError}</p>}
                   <div className="admin-actions-row">{documentModal === "certificate" && !certificatePreview ? <button className="admin-primary-btn" type="button" disabled={documentBusy} onClick={prepareCertificate}>{documentBusy ? "Generating..." : "Preview Certificate"}</button> : <><button className="admin-secondary-btn" type="button" onClick={printDocument}>Print</button>{documentModal === "ism" ? <button className="admin-primary-btn" type="button" disabled={documentBusy} onClick={downloadIsm}>{documentBusy ? "Preparing..." : "Download"} </button> : <><button className="admin-primary-btn" type="button" onClick={downloadCertificate}>Download</button><button className="admin-secondary-btn" type="button" disabled={documentBusy} onClick={openSignatureEditor}>Edit</button></>}<button className="admin-secondary-btn" type="button" onClick={moveNext}>{documentIndex + 1 === documentQueue.length ? "Finish" : "Next"}</button></>}<button className="admin-secondary-btn" type="button" disabled={documentBusy} onClick={closeDocumentModal}>Close</button></div>
                 </>}

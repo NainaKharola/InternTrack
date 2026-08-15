@@ -5839,5 +5839,148 @@
     "status": "Success",
     "timestamp": "2026-08-13T20:46:21.551Z",
     "_id": "428fa49ab799254daab54bf8"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T18:20:53.217Z",
+    "_id": "c3a1a82bffe2ee46dfc7e36a"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T18:21:08.004Z",
+    "_id": "9290504c15d5e14f21a787ec"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T18:47:03.165Z",
+    "_id": "67284e841e564ec9f6f08adf"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Rishi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T20:30:22.124Z",
+    "_id": "cc3549375e3359cc36dec4c3"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T20:36:54.834Z",
+    "_id": "29d3029ebd7caf0c227523e5"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T20:41:31.521Z",
+    "_id": "8b67b93b5fb3bea0c499264e"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T20:43:20.863Z",
+    "_id": "df878e843bc4267793fbb3df"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T20:45:02.577Z",
+    "_id": "49905ca47b4edb4e19176ab1"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'VI'.",
+    "status": "Success",
+    "timestamp": "2026-08-15T20:49:32.777Z",
+    "_id": "dd418e28c657d1ffb05e1189"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Printed ISM",
+    "description": "Printed final Joining ISM PDF for letter number 'DRDO/GYAPAN/2026/1786826972719'.",
+    "status": "Success",
+    "timestamp": "2026-08-15T20:49:40.002Z",
+    "_id": "3fe4b8d0340ac0ad8d2e5583"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Offer Letter",
+    "action": "Printed Offer Letter",
+    "description": "Printed offer letter for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-15T20:52:30.722Z",
+    "_id": "f8e80208791cd73215ca22a5"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T20:58:39.754Z",
+    "_id": "736826f180e43a1a5cf0e1d9"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-15T21:02:55.182Z",
+    "_id": "4bab19bf20780f9294fc8cbb"
   }
 ]

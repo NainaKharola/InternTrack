@@ -94,6 +94,7 @@ export async function deleteAdminStudents(ids) {
 }
 
 export async function downloadAttendanceReportPdf(html) {
+  console.info("ATTENDANCE REPORT GENERATION REQUEST STARTED");
   const response = await fetch(`${API_URL}/attendance-report/pdf`, {
     method: "POST",
     headers: {
@@ -102,10 +103,21 @@ export async function downloadAttendanceReportPdf(html) {
     },
     body: JSON.stringify({ html }),
   });
+  console.info("ATTENDANCE REPORT RESPONSE RECEIVED", {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+  });
   if (!response.ok) {
-    throw new Error("Failed to generate PDF report.");
+    const body = await response.json().catch(() => ({}));
+    console.error("ATTENDANCE REPORT GENERATION ERROR", {
+      status: response.status,
+      response: body,
+    });
+    throw new Error(body.message || "Failed to generate PDF report.");
   }
-  return response.blob();
+  const blob = await response.blob();
+  console.info("ATTENDANCE REPORT PDF BLOB SIZE:", blob.size);
+  return blob;
 }
 
 export async function updateStudentReview(id, payload) {
@@ -196,8 +208,10 @@ export async function downloadCertificates(ids, endpoint = "certificates", rende
     status: response.status,
     contentType: response.headers.get("content-type"),
   });
+  const blob = await response.blob();
+  console.info("CERTIFICATE PDF BLOB SIZE:", blob.size);
   return {
-    blob: await response.blob(),
+    blob,
     filename:
   response.headers
     .get("content-disposition")
@@ -442,4 +456,23 @@ export async function resetPasswordQuestions(payload) {
     body: JSON.stringify(payload),
   });
   return parseResponse(response);
+}
+
+export async function createPdfUrl(response) {
+  let blob;
+  if (response && response.data instanceof Blob) {
+    blob = response.data;
+  } else if (response instanceof Blob) {
+    blob = response;
+  } else if (response && typeof response.blob === "function") {
+    blob = await response.blob();
+  } else if (response && response.data) {
+    blob = new Blob([response.data], { type: "application/pdf" });
+  } else {
+    blob = new Blob([response], { type: "application/pdf" });
+  }
+  if (!blob.size) {
+    throw new Error("Generated PDF is empty");
+  }
+  return URL.createObjectURL(blob);
 }
