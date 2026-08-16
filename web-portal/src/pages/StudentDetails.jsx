@@ -238,6 +238,11 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
     setDirty(true);
   };
 
+  const handlePaidMonthsChange = (event) => {
+    const months = event.target.value.replace(/\D/g, "");
+    handleChange({ target: { name: "trainingDuration", value: months ? `${months} Months` : "" } });
+  };
+
   const save = async (payload = form) => {
     const latestStats = await loadStats() || divisionStats;
     const selectedDivisionStats = latestStats[payload.division];
@@ -525,13 +530,27 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
       />
     </label>
 
-          <label className="admin-field">
-            <span>Training Duration</span>
-            <select name="trainingDuration" value={form.trainingDuration} onChange={handleChange}>
-              <option value="">Select duration</option>
-              {sortDurations(internshipDurations).map((duration) => <option key={duration} value={duration}>{duration}</option>)}
-            </select>
-          </label>
+          {student.internshipType === "Paid" ? (
+            <label className="admin-field">
+              <span>Number of Months</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={String(form.trainingDuration || "").match(/\d+/)?.[0] || ""}
+                onChange={handlePaidMonthsChange}
+              />
+            </label>
+          ) : (
+            <label className="admin-field">
+              <span>Training Duration</span>
+              <select name="trainingDuration" value={form.trainingDuration} onChange={handleChange}>
+                <option value="">Select duration</option>
+                {sortDurations(internshipDurations).map((duration) => <option key={duration} value={duration}>{duration}</option>)}
+              </select>
+            </label>
+          )}
 
           {[
             ["joined", "Joined"],

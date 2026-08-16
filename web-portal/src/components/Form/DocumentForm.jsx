@@ -12,7 +12,15 @@ function DocumentForm({ form, errors, onChange }) {
       <section className="form-section">
         <h2>Internship Details</h2>
         <div className="form-grid">
-          {form.internshipType !== "Paid" && (
+          {form.internshipType === "Paid" ? (
+            <TextInput
+              label="Internship Duration"
+              name="internshipDuration"
+              value="6 Months"
+              onChange={onChange}
+              disabled
+            />
+          ) : (
             <SelectInput
               label="Internship Duration"
               name="internshipDuration"

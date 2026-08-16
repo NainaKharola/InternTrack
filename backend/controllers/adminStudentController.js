@@ -199,6 +199,12 @@ function addDurationToDate(fromDate, duration) {
   return date.toISOString().slice(0, 10);
 }
 
+function normalizePaidDuration(value) {
+  const match = String(value || "").trim().match(/^(\d+)\s*(?:months?)?$/i);
+  const months = match ? Number(match[1]) : NaN;
+  return Number.isSafeInteger(months) && months > 0 ? `${months} Months` : "";
+}
+
 async function removeStudentAssets(student) {
   await Promise.allSettled([
     removeLocalFile(student.resume),
@@ -431,6 +437,14 @@ async function updateStudentReview(req, res) {
         success: false,
         message: "Student not found.",
       });
+    }
+
+    if (student.internshipType === "Paid" && req.body.internshipDuration !== undefined) {
+      const duration = normalizePaidDuration(req.body.internshipDuration);
+      if (!duration) {
+        return res.status(400).json({ success: false, message: "Enter a whole number of months for a paid internship." });
+      }
+      req.body.internshipDuration = duration;
     }
 
     if (req.body.status !== undefined && !allowedStatuses.includes(req.body.status)) {
@@ -671,6 +685,12 @@ async function saveTrainingManagement(req, res) {
     }
 
     const isPaidInternship = student.internshipType === "Paid";
+    const paidTrainingDuration = isPaidInternship && req.body.trainingDuration !== undefined
+      ? normalizePaidDuration(req.body.trainingDuration)
+      : "";
+    if (isPaidInternship && req.body.trainingDuration !== undefined && !paidTrainingDuration) {
+      return res.status(400).json({ success: false, message: "Enter a whole number of months for a paid internship." });
+    }
     const resignationStatus = isPaidInternship && req.body.resignationStatus === "Yes" ? "Yes" : "No";
     const resignationDateValue = String(req.body.resignationDate || "").trim();
     if (isPaidInternship && resignationStatus === "Yes") {
@@ -690,13 +710,13 @@ async function saveTrainingManagement(req, res) {
       branch: req.body.branch || student.branch,
       collegeName: req.body.collegeName || student.collegeName,
       collegeLocation: req.body.collegeLocation || student.location,
-      trainingDuration: req.body.trainingDuration || student.internshipDuration || (student.internshipType === "Paid" ? "6 Months" : ""),
+      trainingDuration: paidTrainingDuration || req.body.trainingDuration || student.internshipDuration || (student.internshipType === "Paid" ? "6 Months" : ""),
       fromDate: req.body.fromDate || "",
       toDate:
         req.body.toDate ||
         addDurationToDate(
           req.body.fromDate,
-          req.body.trainingDuration || student.internshipDuration || (student.internshipType === "Paid" ? "6 Months" : ""),
+          paidTrainingDuration || req.body.trainingDuration || student.internshipDuration || (student.internshipType === "Paid" ? "6 Months" : ""),
         ),
       joined: req.body.joined || "",
       division,
@@ -902,6 +922,14 @@ async function updateStudentDetails(req, res) {
     }
 
     const body = req.body;
+
+    if (student.internshipType === "Paid" && body.internshipDuration !== undefined) {
+      const duration = normalizePaidDuration(body.internshipDuration);
+      if (!duration) {
+        return res.status(400).json({ success: false, message: "Enter a whole number of months for a paid internship." });
+      }
+      body.internshipDuration = duration;
+    }
 
     const nextBranch = String(body.branch !== undefined ? body.branch : student.branch).trim();
     const branchChanged = body.branch !== undefined && nextBranch !== student.branch;

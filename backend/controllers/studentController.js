@@ -52,6 +52,9 @@ function isValidDateValue(value) {
 }
 
 function validateRequest(body, files) {
+  if (body.internshipType === "Paid" && body.internshipDuration && body.internshipDuration !== "6 Months") {
+    return "Paid internship duration is fixed at 6 Months.";
+  }
   const fields = requiredFields.filter(f => !(body.internshipType === "Paid" && f === "internshipDuration"));
   const missingFields = fields.filter(
     (field) => !String(body[field] || "").trim()
@@ -280,7 +283,9 @@ async function createStudent(req, res) {
 
       collegeId: req.body.collegeId,
 
-      internshipDuration: (req.body.internshipType === "Paid") ? (req.body.internshipDuration || "6 Months") : req.body.internshipDuration,
+      // Registration for the paid programme is always six months. This is
+      // intentionally enforced server-side, independently of the form UI.
+      internshipDuration: req.body.internshipType === "Paid" ? "6 Months" : req.body.internshipDuration,
       internshipJoiningDate: req.body.internshipJoiningDate || "",
       internshipJoiningMonth: req.body.internshipJoiningMonth,
 
