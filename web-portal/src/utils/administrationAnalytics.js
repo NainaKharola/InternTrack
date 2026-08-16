@@ -115,18 +115,36 @@ export function getDivisionAllocationRows(divisions, configurations, students) {
 
 export function getGeneralDivisionRecommendations(divisions, configurations, students) {
   const allocated = getAllocatedStudents(students, divisions);
-  const allocations = allocated.reduce((counts, student) => ({ ...counts, [student.trainingManagement?.division]: (counts[student.trainingManagement?.division] || 0) + 1 }), {});
 
   const rows = divisions.map((division) => {
-    const configuredSeats = calculateTotalVacancy(configurations?.[division]);
-    const allocatedStudents = allocations[division] || 0;
-    const availableSeats = calculateAvailableSeats(configuredSeats, allocatedStudents);
+    const configuration = configurations?.[division];
+    const typeCapacity = (typeKey) => (configuration?.allowedBranches || []).reduce((total, branch) => {
+      const seats = configuration?.branchSeats?.[branch];
+      if (seats && typeof seats === "object") return total + nonNegativeNumber(seats[typeKey]);
+      // Numeric legacy branch seats represented unpaid capacity.
+      return total + (typeKey === "unpaid" ? nonNegativeNumber(seats) : 0);
+    }, 0);
+    const paidConfiguredSeats = typeCapacity("paid");
+    const unpaidConfiguredSeats = typeCapacity("unpaid");
+    const paidAllocatedStudents = allocated.filter((student) => student.trainingManagement?.division === division && student.internshipType === "Paid").length;
+    const unpaidAllocatedStudents = allocated.filter((student) => student.trainingManagement?.division === division && student.internshipType !== "Paid").length;
+    const availablePaidSeats = calculateAvailableSeats(paidConfiguredSeats, paidAllocatedStudents);
+    const availableUnpaidSeats = calculateAvailableSeats(unpaidConfiguredSeats, unpaidAllocatedStudents);
+    const configuredSeats = paidConfiguredSeats + unpaidConfiguredSeats;
+    const allocatedStudents = paidAllocatedStudents + unpaidAllocatedStudents;
+    const availableSeats = availablePaidSeats + availableUnpaidSeats;
     const isNull = configuredSeats === 0;
     return {
       division,
       configuredSeats,
       allocatedStudents,
       availableSeats,
+      paidConfiguredSeats,
+      unpaidConfiguredSeats,
+      paidAllocatedStudents,
+      unpaidAllocatedStudents,
+      availablePaidSeats,
+      availableUnpaidSeats,
       utilization: calculateUtilization(allocatedStudents, configuredSeats),
       isNull
     };
