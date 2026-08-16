@@ -1,5 +1,7 @@
+import { createDocumentUrl, readDocumentResponse } from "./documentFileService";
+
 const API_URL =
-`${import.meta.env.VITE_API_URL || "http://localhost:500/api"}/admin`;
+`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/admin`;
 const TOKEN_KEY = "webPortalAdminToken";
 
 export function getAdminToken() {
@@ -115,9 +117,7 @@ export async function downloadAttendanceReportPdf(html) {
     });
     throw new Error(body.message || "Failed to generate PDF report.");
   }
-  const blob = await response.blob();
-  console.info("ATTENDANCE REPORT PDF BLOB SIZE:", blob.size);
-  return blob;
+  return readDocumentResponse(response);
 }
 
 export async function updateStudentReview(id, payload) {
@@ -208,8 +208,7 @@ export async function downloadCertificates(ids, endpoint = "certificates", rende
     status: response.status,
     contentType: response.headers.get("content-type"),
   });
-  const blob = await response.blob();
-  console.info("CERTIFICATE PDF BLOB SIZE:", blob.size);
+  const blob = await readDocumentResponse(response);
   return {
     blob,
     filename:
@@ -471,8 +470,6 @@ export async function createPdfUrl(response) {
   } else {
     blob = new Blob([response], { type: "application/pdf" });
   }
-  if (!blob.size) {
-    throw new Error("Generated PDF is empty");
-  }
-  return URL.createObjectURL(blob);
+  if (!blob.size) throw new Error("Generated PDF is empty");
+  return createDocumentUrl(blob);
 }

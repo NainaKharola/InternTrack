@@ -5982,5 +5982,104 @@
     "status": "Success",
     "timestamp": "2026-08-15T21:02:55.182Z",
     "_id": "4bab19bf20780f9294fc8cbb"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Aarvi.",
+    "status": "Success",
+    "timestamp": "2026-08-16T09:44:29.625Z",
+    "_id": "db9e3903b37ae58c0f3d78b4"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Rishi.",
+    "status": "Success",
+    "timestamp": "2026-08-16T09:47:06.493Z",
+    "_id": "54899d6e5400eb172bdb3987"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Rishi.",
+    "status": "Success",
+    "timestamp": "2026-08-16T09:51:40.452Z",
+    "_id": "3e7faf7eafebf65c626602c5"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Certificate",
+    "action": "Printed Certificate",
+    "description": "Printed certificate for Rishi.",
+    "status": "Success",
+    "timestamp": "2026-08-16T09:54:55.899Z",
+    "_id": "800da4ef3e99d70412a13d1b"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'HR'.",
+    "status": "Success",
+    "timestamp": "2026-08-16T09:55:14.508Z",
+    "_id": "a8691d9825ceb74e00dab17b"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Generated ISM",
+    "description": "Generated Joining ISM preview for 1 trainee(s) in division 'SS & ST'.",
+    "status": "Success",
+    "timestamp": "2026-08-16T09:55:14.597Z",
+    "_id": "958e2d35172b7d2b41d6889d"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Joining ISM",
+    "action": "Printed ISM",
+    "description": "Printed final Joining ISM PDF for letter number 'DRDO/GYAPAN/2026/1786874114480'.",
+    "status": "Success",
+    "timestamp": "2026-08-16T09:55:19.689Z",
+    "_id": "40a9c8984868ba0b8b6ffee3"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Offer Letter",
+    "action": "Printed Offer Letter",
+    "description": "Printed offer letter for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-16T09:56:33.696Z",
+    "_id": "b19e2f5e55aa663215a54f34"
+  },
+  {
+    "userId": "e31546c4431f61379a0a9837",
+    "userName": "Vaibhav Gupta",
+    "role": "SUB_ADMIN",
+    "module": "Offer Letter",
+    "action": "Printed Offer Letter",
+    "description": "Printed offer letter for Rihan.",
+    "status": "Success",
+    "timestamp": "2026-08-16T09:56:53.123Z",
+    "_id": "87968602b0a6e66e702dbeec"
   }
 ]

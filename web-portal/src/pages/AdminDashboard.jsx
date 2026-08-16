@@ -18,6 +18,7 @@ import {
 } from "../services/adminService";
 import { createGyapanPreview, generateGyapanPdf } from "../services/gyapanService";
 import { downloadOfferLetterPdf } from "../services/offerLetterService";
+import { printPdf } from "../services/documentFileService";
 import { getUploadUrl } from "../utils/uploadUrl";
 import { useAdminAuth } from "../auth/useAdminAuth";
 import StudentForm from "../components/Form/StudentForm";
@@ -1885,15 +1886,6 @@ function AdminDashboard() {
     if (!studentId) return;
     const student = students.find((item) => item._id === studentId);
     setOfferLetterBusy(true);
-    let popup;
-    if (action !== "skip" && offerLetterAction === "print") {
-      console.log("OPENING PDF WINDOW");
-      popup = window.open("about:blank", "_blank");
-      console.log("NEW WINDOW:", popup);
-      if (!popup) {
-        console.error("PDF WINDOW FAILED TO OPEN");
-      }
-    }
     try {
       if (action !== "skip") {
         const blob = await downloadOfferLetterPdf(studentId);
@@ -1902,15 +1894,11 @@ function AdminDashboard() {
         console.log("PDF DATA TYPE: Blob");
         console.log("PDF BLOB SIZE:", blob.size);
 
-        const url = await createPdfUrl(blob);
-        console.log("PDF URL:", url);
-
         if (offerLetterAction === "print") {
-          if (popup) {
-            popup.location.href = url;
-            window.setTimeout(() => popup.print(), 800);
-          }
+          printPdf(blob);
         } else {
+          const url = await createPdfUrl(blob);
+          console.log("PDF URL:", url);
           const refId = (student?.referenceId || "UNKNOWN").replace(/[^a-zA-Z0-9_-]/g, "");
           const nameNoSpaces = (student?.name || "Student").replace(/\s+/g, "").replace(/[^a-zA-Z0-9_-]/g, "");
           const link = document.createElement("a");
@@ -1919,14 +1907,12 @@ function AdminDashboard() {
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
-        window.setTimeout(() => URL.revokeObjectURL(url), offerLetterAction === "print" ? 60000 : 1000);
       } else {
-        if (popup) popup.close();
       }
       setOfferLetterIds((current) => current.filter((id) => id !== studentId));
     } catch (err) {
-      if (popup) popup.close();
       setError(err.message || "Unable to generate offer letter.");
     } finally {
       setOfferLetterBusy(false);

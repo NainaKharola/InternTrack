@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchAdministration, fetchAdminStudents, createPdfUrl } from "../services/adminService";
+import { fetchAdministration, fetchAdminStudents } from "../services/adminService";
+import { printPdf } from "../services/documentFileService";
 import "../styles/admin.css";
 
 const REPORT_COLUMNS = [
@@ -484,18 +485,7 @@ function Reports() {
       console.log("PDF DATA TYPE: Blob");
       console.log("PDF BLOB SIZE:", pdfBlob.size);
 
-      const pdfUrl = await createPdfUrl(pdfBlob);
-      console.log("PDF URL:", pdfUrl);
-
-      console.log("OPENING PDF WINDOW");
-      const printWindow = window.open(pdfUrl, "_blank");
-      console.log("NEW WINDOW:", printWindow);
-      if (!printWindow) {
-        console.error("PDF WINDOW FAILED TO OPEN");
-        URL.revokeObjectURL(pdfUrl);
-        return setError("Allow pop-ups to print the PDF report.");
-      }
-      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+      printPdf(pdfBlob);
     } catch (err) {
       setError(err.message || "Failed to print PDF report.");
     }

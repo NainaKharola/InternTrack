@@ -1,4 +1,5 @@
 import { clearAdminToken, getAdminToken } from "./adminService";
+import { readDocumentResponse } from "./documentFileService";
 
 const API_URL = `${import.meta.env.VITE_API_URL}/offer-letter`;
 
@@ -68,9 +69,7 @@ export async function downloadOfferLetterPdf(studentId) {
     if (response.status === 401) clearAdminToken();
     throw new Error(body.message || "Unable to download PDF.");
   }
-  const blob = await response.blob();
-  console.info("OFFER LETTER PDF BLOB SIZE:", blob.size);
-  return blob;
+  return readDocumentResponse(response);
 }
 
 export async function uploadOfferLetterPdf(studentId, file) {

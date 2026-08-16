@@ -1,22 +1,22 @@
 
-const puppeteer = require("puppeteer-core");
-const chromium = require("@sparticuz/chromium").default || require("@sparticuz/chromium");
-
 async function createBrowser() {
   const isProduction = process.env.NODE_ENV === "production";
 
   if (isProduction) {
     const puppeteer = require("puppeteer-core");
-    const chromium = require("@sparticuz/chromium");
+    const chromium = require("@sparticuz/chromium").default || require("@sparticuz/chromium");
     const executablePath = await chromium.executablePath();
     console.log("Using Chrome (prod):", executablePath);
     console.info("PUPPETEER LAUNCH", { environment: "production", executablePath });
     return puppeteer.launch({
       executablePath,
-      headless: chromium.headless === false ? true : chromium.headless,
+      // Never allow the renderer to create a visible desktop browser window.
+      headless: true,
       args: [
         ...chromium.args,
-        "--headless",
+        "--headless=new",
+        "--window-position=-32000,-32000",
+        "--window-size=1,1",
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
@@ -27,9 +27,14 @@ async function createBrowser() {
     const executablePath = await puppeteer.executablePath();
     console.info("PUPPETEER LAUNCH", { environment: "development", executablePath });
     return puppeteer.launch({
-      headless: true,
+      // "shell" starts Puppeteer's chrome-headless-shell binary, rather than
+      // a normal Chrome window that can briefly appear on Windows.
+      headless: "shell",
+      executablePath,
       args: [
-        "--headless=shell",
+        "--headless=new",
+        "--window-position=-32000,-32000",
+        "--window-size=1,1",
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
@@ -76,45 +81,19 @@ async function renderPdf(browser, html) {
   }
 }
 
-let browserInstance = null;
-let browserPromise = null;
-
-async function getBrowser() {
-  if (browserInstance && browserInstance.connected) {
-    return browserInstance;
-  }
-
-  if (browserPromise) {
-    return browserPromise;
-  }
-
-  browserPromise = createBrowser()
-    .then((browser) => {
-      browserInstance = browser;
-      browserPromise = null;
-
-      browser.once("disconnect", () => {
-        console.log("Puppeteer browser disconnected. Clearing instance.");
-        browserInstance = null;
-      });
-
-      return browserInstance;
-    })
-    .catch((err) => {
-      browserPromise = null;
-      throw err;
-    });
-
-  return browserPromise;
-}
-
 async function generatePdfsFromHtml(htmlDocuments) {
+  let browser;
   try {
-    const browser = await getBrowser();
+    browser = await createBrowser();
     return await Promise.all(htmlDocuments.map((html) => renderPdf(browser, html)));
   } catch (error) {
     console.error("PUPPETEER ERROR", { message: error.message, stack: error.stack });
     throw error;
+  } finally {
+    if (browser) {
+      await browser.close().catch(() => {});
+      console.info("PUPPETEER BROWSER CLOSED");
+    }
   }
 }
 
@@ -122,12 +101,5 @@ async function generatePdfFromHtml(html) {
   const [pdf] = await generatePdfsFromHtml([html]);
   return pdf;
 }
-
-// Clean up Puppeteer instance on server exit
-process.on("exit", () => {
-  if (browserInstance) {
-    browserInstance.close().catch(() => {});
-  }
-});
 
 module.exports = { generatePdfFromHtml, generatePdfsFromHtml };
