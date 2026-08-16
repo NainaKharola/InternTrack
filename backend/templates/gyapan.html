@@ -138,7 +138,7 @@
     .cc-title {
       font-weight: bold;
       text-decoration: underline;
-      margin-bottom: 10px;
+      margin-bottom: 0px;
     }
 
     .system-footer {
@@ -163,11 +163,26 @@
 
       .document-container {
         width: 210mm;
-        min-height: 0;
+        min-height: 297mm;
         margin: 0;
         padding: 20mm;
         box-shadow: none;
         overflow: visible;
+      }
+
+      /* The preview keeps generous vertical spacing.  In print, those two
+         * stacked spacer margins push only the system footer to page two. */
+      .cc-section {
+        margin-bottom: 0;
+      }
+
+      .system-footer {
+        position: absolute;
+        left: 20mm;
+        right: 20mm;
+        bottom: 10mm;
+        width: auto;
+        margin: 0;
       }
     }
   </style>

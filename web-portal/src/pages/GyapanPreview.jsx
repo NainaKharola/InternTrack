@@ -50,7 +50,15 @@ function GyapanPreview({ gyapanId, bufferMode = false }) {
     const frame = document.getElementById("gyapan-frame");
     if (!frame) return;
 
-    const printDocument = () => frame.contentWindow?.print();
+    const printDocument = () => {
+      if (frame.contentDocument && !frame.contentDocument.getElementById("ism-print-fit")) {
+        const style = frame.contentDocument.createElement("style");
+        style.id = "ism-print-fit";
+        style.textContent = "@media print { .document-container { min-height: 297mm !important; } .cc-section { margin-bottom: 0 !important; } .system-footer { position: absolute !important; left: 20mm !important; right: 20mm !important; bottom: 10mm !important; width: auto !important; margin: 0 !important; } }";
+        frame.contentDocument.head.appendChild(style);
+      }
+      frame.contentWindow?.print();
+    };
     if (frame.contentDocument?.readyState === "complete") {
       printDocument();
     } else {

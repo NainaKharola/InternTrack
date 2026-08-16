@@ -2812,9 +2812,16 @@ function AdminDashboard() {
               if (documentIndex + 1 >= documentQueue.length) closeDocumentModal();
               else setDocumentIndex((index) => index + 1);
             };
-            const printDocument = () => documentModal === "certificate"
-              ? document.getElementById("dashboard-certificate-preview")?.contentWindow?.print()
-              : document.getElementById("dashboard-ism-preview")?.contentWindow?.print();
+            const printDocument = () => {
+              const frame = document.getElementById(documentModal === "certificate" ? "dashboard-certificate-preview" : "dashboard-ism-preview");
+              if (documentModal === "ism" && frame?.contentDocument && !frame.contentDocument.getElementById("ism-print-fit")) {
+                const style = frame.contentDocument.createElement("style");
+                style.id = "ism-print-fit";
+                style.textContent = "@media print { .document-container { min-height: 297mm !important; } .cc-section { margin-bottom: 0 !important; } .system-footer { position: absolute !important; left: 20mm !important; right: 20mm !important; bottom: 10mm !important; width: auto !important; margin: 0 !important; } }";
+                frame.contentDocument.head.appendChild(style);
+              }
+              frame?.contentWindow?.print();
+            };
             return <div className="certificate-modal-backdrop" role="dialog" aria-modal="true" aria-label={`Generate ${documentModal === "ism" ? "ISM" : "Certificate"}`}>
               <section className="certificate-modal certificate-modal--wide">
                 {selectionOpen ? (documentOutputChoice ? <>
