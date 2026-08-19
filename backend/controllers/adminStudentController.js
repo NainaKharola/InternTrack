@@ -1009,7 +1009,7 @@ async function updateStudentDetails(req, res) {
       return res.status(400).json({ success: false, message: "Date of birth cannot be in the future." });
     }
 
-    if (body.internshipJoiningMonth && !/^\d{4}-\d{2}$/.test(body.internshipJoiningMonth)) {
+    if (student.internshipType !== "Paid" && body.internshipJoiningMonth && !/^\d{4}-\d{2}$/.test(body.internshipJoiningMonth)) {
       return res.status(400).json({ success: false, message: "Select a valid internship joining month." });
     }
 

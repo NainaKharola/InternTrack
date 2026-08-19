@@ -133,8 +133,7 @@ function validateStepTwo(form) {
   ];
 
   const requiredFields = [
-    ...(form.internshipType === "Paid" ? [] : ["internshipDuration"]),
-    "internshipJoiningMonth",
+    ...(form.internshipType === "Paid" ? [] : ["internshipDuration", "internshipJoiningMonth"]),
     "permissionLetterNumber",
     "permissionLetterDate",
   ];

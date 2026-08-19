@@ -55,7 +55,7 @@ function validateRequest(body, files) {
   if (body.internshipType === "Paid" && body.internshipDuration && body.internshipDuration !== "6 Months") {
     return "Paid internship duration is fixed at 6 Months.";
   }
-  const fields = requiredFields.filter(f => !(body.internshipType === "Paid" && f === "internshipDuration"));
+  const fields = requiredFields.filter(f => !(body.internshipType === "Paid" && (f === "internshipDuration" || f === "internshipJoiningMonth")));
   const missingFields = fields.filter(
     (field) => !String(body[field] || "").trim()
   );
@@ -129,7 +129,7 @@ function validateRequest(body, files) {
     return "Date of birth cannot be in the future.";
   }
 
-  if (!/^\d{4}-\d{2}$/.test(body.internshipJoiningMonth || "")) {
+  if (body.internshipType !== "Paid" && !/^\d{4}-\d{2}$/.test(body.internshipJoiningMonth || "")) {
     return "Select a valid internship joining month.";
   }
 

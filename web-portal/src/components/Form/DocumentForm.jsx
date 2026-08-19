@@ -31,15 +31,17 @@ function DocumentForm({ form, errors, onChange }) {
               required
             />
           )}
-          <TextInput
-            label="Joining Month"
-            name="internshipJoiningMonth"
-            type="month"
-            value={form.internshipJoiningMonth}
-            onChange={onChange}
-            error={errors.internshipJoiningMonth}
-            required
-          />
+          {form.internshipType !== "Paid" && (
+            <TextInput
+              label="Joining Month"
+              name="internshipJoiningMonth"
+              type="month"
+              value={form.internshipJoiningMonth}
+              onChange={onChange}
+              error={errors.internshipJoiningMonth}
+              required
+            />
+          )}
           <TextInput
             label="College Recommendation Letter Number"
             name="permissionLetterNumber"

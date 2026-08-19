@@ -412,7 +412,7 @@ function StudentDashboard() {
             <form className="training-form" onSubmit={handleProjectDetailsSave}>
               {[
                 ["projectName", "Name of Project"],
-                ["designationTitle", "Title of Designation"],
+                ["designationTitle", "Title of Assignment"],
                 ["supervisorName", "Name of Supervisor"],
                 ["projectNameAndPdc", "Name & PDC of the Project in which Working"],
                 ["achievements", "Achievements"],
