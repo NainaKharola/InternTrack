@@ -52,12 +52,24 @@ function uploadOfferLetter(req, res, next) {
     }
 
     try {
+      const Student = require("../models/Student");
+      const student = await Student.findById(req.params.studentId);
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found." });
+      }
+
       const cleanName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9.-]/g, "_");
-      const result = await saveLocalFile(req.file.buffer, "offerLetters", cleanName);
+      const extension = path.extname(cleanName) || ".pdf";
+      const crypto = require("crypto");
+      const filename = `${Date.now()}-${crypto.randomBytes(5).toString("hex")}${extension.toLowerCase()}`;
+      const s3Key = `students/${student.referenceId}/offer-letters/${filename}`;
+
+      const { uploadFile } = require("../services/s3StorageService");
+      const result = await uploadFile(req.file.buffer, s3Key, req.file.mimetype);
 
       req.uploadedOfferLetter = {
         url: result.url,
-        publicId: result.filename,
+        publicId: s3Key,
       };
 
       next();

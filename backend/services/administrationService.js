@@ -6,6 +6,7 @@ const defaultConfiguration = {
   paidSeatLimit: undefined,
   unpaidSeatLimit: undefined,
   totalSeatLimit: undefined,
+  nextCertificateNumber: 100,
   divisions: [
     "Servo System", "ABS", "SS & ST", "NS (Naval System)", "OD (Optical Design)", "CS & S", "ALTDS", "LI", "LS", "LPF", "Photonics", "EAD", "LIDAR", "FTIR", "HR", "MS", "ISO", "AI", "VI", "IRST", "OME", "LIC", "ENV", "Reprography", "MT", "P & C", "AV", "CMD", "DIR", "HRD", "WORKS", "MI", "SECURITY",
   ],
@@ -59,6 +60,7 @@ async function getAdministration() {
     Object.keys(value.divisionConfigurations).forEach((division) => {
       if (!value.divisions.includes(division)) delete value.divisionConfigurations[division];
     });
+    value.nextCertificateNumber = Number.isSafeInteger(value.nextCertificateNumber) && value.nextCertificateNumber > 0 ? value.nextCertificateNumber : 100;
     return value;
   } catch (error) {
     const config = clone(defaultConfiguration);
@@ -78,4 +80,44 @@ async function saveAdministration(configuration) {
   return configuration;
 }
 
-module.exports = { getAdministration, saveAdministration };
+async function reserveNextCertificateNumber(studentId) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const studentRes = await client.query("SELECT student_data FROM students WHERE student_data->>'_id' = $1", [studentId]);
+    if (studentRes.rows.length === 0) throw new Error("Student not found");
+    
+    const studentData = studentRes.rows[0].student_data;
+    if (studentData.certificateNumber !== null && studentData.certificateNumber !== undefined) {
+      await client.query("COMMIT");
+      return studentData.certificateNumber;
+    }
+    
+    const adminRes = await client.query("SELECT id, data FROM administration LIMIT 1 FOR UPDATE");
+    if (adminRes.rows.length === 0) throw new Error("Administration settings not initialized");
+    
+    const adminId = adminRes.rows[0].id;
+    const adminData = adminRes.rows[0].data;
+    
+    let nextNum = Number(adminData.nextCertificateNumber);
+    if (!Number.isInteger(nextNum) || nextNum <= 0) nextNum = 100;
+    
+    const assignedNum = nextNum;
+    adminData.nextCertificateNumber = nextNum + 1;
+    
+    await client.query("UPDATE administration SET data = $1, updated_at = NOW() WHERE id = $2", [adminData, adminId]);
+    
+    studentData.certificateNumber = assignedNum;
+    await client.query("UPDATE students SET student_data = $1, updated_at = NOW() WHERE student_data->>'_id' = $2", [studentData, studentId]);
+    
+    await client.query("COMMIT");
+    return assignedNum;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { getAdministration, saveAdministration, reserveNextCertificateNumber };

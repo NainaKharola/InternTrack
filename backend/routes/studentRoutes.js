@@ -5,6 +5,7 @@ const {
   downloadStudentDocument,
   getStudentDashboard,
   loginStudent,
+  logoutStudent,
   savePaidInternshipProjectDetails,
   uploadCompletedStudentDocuments,
 } = require("../controllers/studentController");
@@ -19,6 +20,7 @@ const router = express.Router();
 
 router.post("/", uploadStudentDocuments, createStudent);
 router.post("/login", loginStudent);
+router.post("/logout", logoutStudent);
 router.get("/dashboard", protectStudent, getStudentDashboard);
 router.patch("/paid-project-details", protectStudent, savePaidInternshipProjectDetails);
 router.get("/documents/:type", protectStudent, downloadStudentDocument);

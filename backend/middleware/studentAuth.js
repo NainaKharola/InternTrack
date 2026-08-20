@@ -3,12 +3,14 @@ const Student = require("../models/Student");
 
 async function protectStudent(req, res, next) {
   try {
-    let token = "";
-    const authHeader = req.headers.authorization || "";
-    if (authHeader.startsWith("Bearer ")) {
-      token = authHeader.split(" ")[1];
-    } else if (req.query.token) {
-      token = req.query.token;
+    let token = req.cookies?.token;
+    if (!token) {
+      const authHeader = req.headers.authorization || "";
+      if (authHeader.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
+      } else if (req.query.token) {
+        token = req.query.token;
+      }
     }
 
     if (!token) {

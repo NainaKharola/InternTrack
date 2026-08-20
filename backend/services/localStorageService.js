@@ -143,10 +143,28 @@ async function saveLocalFile(buffer, folder, originalName = "document.pdf") {
 }
 
 async function removeLocalFile(file) {
-  const url = file?.url || file;
-  if (!url || !String(url).startsWith("/uploads/")) return;
-  const localPath = path.join(__dirname, "..", String(url).replace(/^\/+/, ""));
-  try { await fs.unlink(localPath); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  const url = file?.url || file?.pdfUrl || file;
+  if (!url) return;
+
+  // 1. Delete from S3/MinIO
+  try {
+    const { deleteFile } = require("./s3StorageService");
+    await deleteFile(url);
+  } catch (s3Error) {
+    console.error("Failed to delete file from S3:", s3Error);
+  }
+
+  // 2. Delete from local storage (if it exists)
+  if (String(url).startsWith("/uploads/")) {
+    const localPath = path.join(__dirname, "..", String(url).replace(/^\/+/, ""));
+    try {
+      await fs.unlink(localPath);
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        console.error("Failed to delete local file:", error);
+      }
+    }
+  }
 }
 
 module.exports = { createLocalModel, readJson, writeJson, saveLocalFile, removeLocalFile };

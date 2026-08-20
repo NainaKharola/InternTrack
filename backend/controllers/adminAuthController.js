@@ -36,13 +36,18 @@ async function registerAdmin(req, res) {
     const { name, email, password, setupKey } = req.body;
     const adminCount = await Admin.countDocuments();
 
-    if (
-      adminCount > 0 &&
-      (!process.env.ADMIN_SETUP_KEY || setupKey !== process.env.ADMIN_SETUP_KEY)
-    ) {
-      return res.status(403).json({
+    const requiredSetupKey = process.env.ADMIN_SETUP_KEY;
+    if (requiredSetupKey) {
+      if (setupKey !== requiredSetupKey) {
+        return res.status(403).json({
+          success: false,
+          message: "Admin setup key is incorrect or required.",
+        });
+      }
+    } else if (process.env.NODE_ENV === "production") {
+      return res.status(500).json({
         success: false,
-        message: "Admin setup key is required.",
+        message: "Server configuration error: ADMIN_SETUP_KEY is not configured.",
       });
     }
 
@@ -120,6 +125,13 @@ async function loginAdmin(req, res) {
 
     const token = signToken(admin);
 
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
+
     return res.status(200).json({
       success: true,
       admin: sanitizeAdmin(admin),
@@ -196,6 +208,15 @@ async function changeAdminPassword(req, res) {
 
     return res.status(500).json({ success: false, message: error.message || "Failed to change password." });
   }
+}
+
+async function logoutAdmin(req, res) {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+  return res.status(200).json({ success: true, message: "Logged out successfully." });
 }
 
 async function setupRecoveryInfo(req, res) {
@@ -756,6 +777,7 @@ async function resetPasswordQuestions(req, res) {
 module.exports = {
   registerAdmin,
   loginAdmin,
+  logoutAdmin,
   getAdminProfile,
   changeAdminPassword,
   setupRecoveryInfo,

@@ -17,9 +17,7 @@ export function setAdminToken(token) {
 export function clearAdminToken() {
   sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
-  // The app does not issue an auth cookie, but expire a legacy cookie if one
-  // exists from an earlier deployment.
-  document.cookie = `${TOKEN_KEY}=; Max-Age=0; Path=/; SameSite=Lax`;
+  fetch(`${API_URL}/auth/logout`, { method: "POST" }).catch(() => {});
   window.dispatchEvent(new Event("admin-auth-changed"));
 }
 
@@ -453,6 +451,18 @@ export async function resetPasswordQuestions(payload) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+  return parseResponse(response);
+}
+
+export async function updateNextCertificateNumber(nextCertificateNumber) {
+  const response = await fetch(`${API_URL}/administration/certificate-number`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ nextCertificateNumber }),
   });
   return parseResponse(response);
 }

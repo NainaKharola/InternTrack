@@ -1,6 +1,26 @@
 const multer = require("multer");
 const path = require("path");
 const { saveLocalFile } = require("../services/localStorageService");
+const { uploadFile } = require("../services/s3StorageService");
+const Student = require("../models/Student");
+const crypto = require("crypto");
+
+function generateReferenceId() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from({ length: 7 }, () => {
+    const index = crypto.randomInt(0, chars.length);
+    return chars[index];
+  }).join("");
+}
+
+async function createUniqueReferenceId() {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const referenceId = generateReferenceId();
+    const exists = await Student.exists({ referenceId });
+    if (!exists) return referenceId;
+  }
+  throw new Error("Unable to generate a unique Reference ID.");
+}
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const PHOTO_MAX_FILE_SIZE = 1 * 1024 * 1024;
@@ -150,16 +170,26 @@ function uploadStudentDocuments(req, res, next) {
           }
         }
 
+        const referenceId = await createUniqueReferenceId();
+        req.referenceId = referenceId;
+
         const uploadPromises = Object.keys(req.files).map(async (fieldName) => {
           const file = req.files[fieldName][0];
-          // Prevent directory traversal by sanitizing originalname to safe alphanumeric base
           const cleanName = path.basename(file.originalname).replace(/[^a-zA-Z0-9.-]/g, "_");
-          const result = await saveLocalFile(file.buffer, uploadFolders[fieldName], cleanName);
+          const extension = path.extname(cleanName) || ".pdf";
+          const filename = `${Date.now()}-${crypto.randomBytes(5).toString("hex")}${extension.toLowerCase()}`;
+          
+          let folderName = fieldName;
+          if (fieldName === "permissionLetter") folderName = "permission-letter";
+          if (fieldName === "aadhaarCard") folderName = "aadhaar";
+          
+          const s3Key = `students/${referenceId}/${folderName}/${filename}`;
+          const result = await uploadFile(file.buffer, s3Key, file.mimetype);
           return {
             fieldName,
             data: {
               url: result.url,
-              public_id: result.filename,
+              public_id: s3Key,
               originalName: cleanName,
             },
           };
@@ -226,12 +256,17 @@ function uploadCompletedDocuments(req, res, next) {
     }
 
     try {
+      const referenceId = req.student.referenceId;
       const cleanName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9.-]/g, "_");
-      const result = await saveLocalFile(req.file.buffer, "completedDocuments", cleanName);
+      const extension = path.extname(cleanName) || ".pdf";
+      const filename = `${Date.now()}-${crypto.randomBytes(5).toString("hex")}${extension.toLowerCase()}`;
+      const s3Key = `students/${referenceId}/completed-documents/${filename}`;
+      
+      const result = await uploadFile(req.file.buffer, s3Key, req.file.mimetype);
 
       req.uploadedCompletedDocuments = {
         url: result.url,
-        publicId: result.filename,
+        publicId: s3Key,
       };
 
       next();

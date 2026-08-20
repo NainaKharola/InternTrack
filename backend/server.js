@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const requiredEnv = ["JWT_SECRET", "DB_PASSWORD", "MAIN_ADMIN_EMAIL"];
+const requiredEnv = ["JWT_SECRET", "DB_PASSWORD", "MAIN_ADMIN_EMAIL", "ENCRYPTION_KEY"];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length > 0) {
   console.error(`❌ Startup Error: Missing required environment variables: ${missingEnv.join(", ")}`);
@@ -13,11 +13,14 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 
 const adminRoutes = require("./routes/adminRoutes");
 const offerLetterRoutes = require("./routes/offerLetterRoutes");
 const studentRoutes = require("./routes/studentRoutes");
 const collegeRoutes = require("./routes/collegeRoutes");
+const { protectFileAccess } = require("./middleware/fileAuth");
+const { getFileStream, verifyMinioConnection } = require("./services/s3StorageService");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,9 +28,19 @@ const PORT = process.env.PORT || 5000;
 const pool = require("./db");
 
 pool.query("SELECT NOW()")
-  .then(result => {
+  .then(async (result) => {
     console.log("PostgreSQL test successful:");
     console.log(result.rows[0]);
+    try {
+      console.log("Creating database indexes if not exist...");
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_students_email ON students ((student_data->>'email'))");
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_students_status ON students ((student_data->>'status'))");
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_students_referenceId ON students ((student_data->>'referenceId'))");
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_admins_email ON admins ((admin_data->>'email'))");
+      console.log("✅ Database indexes ready");
+    } catch (err) {
+      console.error("❌ Database indexing failed:", err.message);
+    }
   })
   .catch(err => {
     console.error("PostgreSQL connection failed:", err.message);
@@ -59,6 +72,13 @@ const generalLimiter = rateLimit({
 
 app.use("/api/", generalLimiter);
 app.use("/api/admin/auth", authLimiter);
+app.use("/api/students/login", authLimiter);
+app.use("/api/students", (req, res, next) => {
+  if (req.method === "POST" && req.path === "/") {
+    return authLimiter(req, res, next);
+  }
+  next();
+});
 
 const allowedOrigins = process.env.NODE_ENV === "production"
   ? ["https://web-portal-hazel-six.vercel.app"]
@@ -89,6 +109,7 @@ app.use(
 // ========================
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cookieParser());
 
 // Admin responses can contain sensitive registration data. Prevent browsers
 // and intermediary caches from restoring an authenticated view after logout.
@@ -101,7 +122,36 @@ app.use(["/api/admin", "/api/offer-letter"], (req, res, next) => {
 // ========================
 // Static Upload Folder
 // ========================
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", protectFileAccess, async (req, res, next) => {
+  const relativePath = req.path.replace(/^\/+/, "");
+  const localFilePath = path.join(__dirname, "uploads", relativePath);
+
+  try {
+    await fs.promises.access(localFilePath);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox;");
+    return res.sendFile(localFilePath);
+  } catch (err) {
+    try {
+      const stream = await getFileStream(relativePath);
+      const ext = path.extname(relativePath).toLowerCase();
+      const mimeTypes = {
+        ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg"
+      };
+      if (mimeTypes[ext]) {
+        res.setHeader("Content-Type", mimeTypes[ext]);
+      }
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox;");
+      stream.pipe(res);
+    } catch (s3Err) {
+      next();
+    }
+  }
+});
 
 // ========================
 // Health Check
@@ -149,6 +199,12 @@ app.use((err, req, res, next) => {
 // ========================
 // Start Server
 // ========================
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  try {
+    await verifyMinioConnection();
+  } catch (error) {
+    // Non-fatal warning at startup; it will fail on demand if bucket is needed
+    console.error("❌ MinIO startup check failed:", error.message);
+  }
 });

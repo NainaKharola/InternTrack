@@ -243,11 +243,10 @@ async function generateFinalPdf(req, res) {
         message: "Gyapan PDF has already been generated.",
       });
     const pdf = await generatePdfFromHtml(gyapan.html);
-    const upload = await saveLocalFile(
-      pdf,
-      "gyapan",
-      `Gyapan-${gyapan._id}.pdf`,
-    );
+    const { uploadFile } = require("../services/s3StorageService");
+    const filename = `Gyapan-${gyapan._id}-${Date.now()}.pdf`;
+    const s3Key = `gyapan/${filename}`;
+    const upload = await uploadFile(pdf, s3Key, "application/pdf");
     console.log("UPLOAD OBJECT:", upload);
     console.log("PDF URL:", upload.url);
     gyapan.generated = true;
@@ -255,7 +254,7 @@ async function generateFinalPdf(req, res) {
     gyapan.generatedBy = req.admin.email;
     gyapan.pdfUrl = upload.url;
     gyapan.gyapanUrl = upload.url;
-    gyapan.publicId = upload.filename;
+    gyapan.publicId = s3Key;
     await gyapan.save();
     if (!gyapan.bufferMode) {
       for (const studentId of gyapan.selectedStudents) {

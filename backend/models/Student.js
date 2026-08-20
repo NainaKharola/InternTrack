@@ -37,4 +37,5 @@ module.exports = createPostgresModel("students.json", {
   },
   resignationStatus: "No",
   resignationDate: null,
+  certificateNumber: null,
 });

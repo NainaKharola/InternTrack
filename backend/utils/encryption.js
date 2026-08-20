@@ -1,9 +1,10 @@
 const crypto = require("crypto");
 
 const ALGORITHM = "aes-256-gcm";
-// Enforce encryption key or fallback to a standard development key (ONLY for local dev)
-const devKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-const KEY = Buffer.from(process.env.ENCRYPTION_KEY || devKey, "hex");
+if (!process.env.ENCRYPTION_KEY) {
+  throw new Error("CRITICAL SECURITY ERROR: ENCRYPTION_KEY is required in the environment.");
+}
+const KEY = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
 
 function encrypt(text) {
   if (!text) return text;

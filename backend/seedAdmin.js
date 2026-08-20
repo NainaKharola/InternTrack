@@ -6,7 +6,11 @@ const Admin = require("./models/Admin");
 
 async function seedAdmins() {
   try {
-    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL;
+    if (!mainAdminEmail) {
+      console.error("❌ MAIN_ADMIN_EMAIL is not configured in the .env file.");
+      process.exit(1);
+    }
     
     // Check if the main admin already exists
     const existingAdmin = await Admin.findOne({ email: mainAdminEmail });

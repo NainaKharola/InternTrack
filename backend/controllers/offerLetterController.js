@@ -387,12 +387,15 @@ async function sendOfferLetter(req, res) {
         student.offerLetter?.html || (await generateOfferLetterHtml(student));
       pdfBuffer = await generatePdfFromHtml(html);
 
-      uploadResult = await saveLocalFile(pdfBuffer, "offerLetters", "DRDO-Internship-Offer-Letter.pdf");
+      const { uploadFile } = require("../services/s3StorageService");
+      const filename = `DRDO-Internship-Offer-Letter-${Date.now()}.pdf`;
+      const s3Key = `students/${student.referenceId}/offer-letters/${filename}`;
+      uploadResult = await uploadFile(pdfBuffer, s3Key, "application/pdf");
 
       student.offerLetter = {
         ...currentOfferLetter(student),
         url: uploadResult.url,
-        publicId: uploadResult.filename,
+        publicId: s3Key,
         uploadType: "Generated",
         status: "Generated",
         html,

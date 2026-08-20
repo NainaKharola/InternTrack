@@ -6,6 +6,7 @@ import {
   removeDivision,
   renameDivision,
   updateTotalAllocatedSeats,
+  updateNextCertificateNumber,
 } from "../services/adminService";
 import DivisionBranchVacancyConfiguration from "../components/Admin/DivisionBranchVacancyConfiguration";
 import DivisionBranchAnalytics from "../components/Admin/DivisionBranchAnalytics";
@@ -17,6 +18,7 @@ function Administration() {
   const [divisionName, setDivisionName] = useState("");
   const [paidSeatLimit, setPaidSeatLimit] = useState("");
   const [unpaidSeatLimit, setUnpaidSeatLimit] = useState("");
+  const [nextCertificateNumber, setNextCertificateNumber] = useState("");
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [message, setMessage] = useState("");
@@ -50,6 +52,7 @@ function Administration() {
     setAdministration(next);
     setPaidSeatLimit(next.paidSeatLimit === undefined ? "" : String(next.paidSeatLimit));
     setUnpaidSeatLimit(next.unpaidSeatLimit === undefined ? "" : String(next.unpaidSeatLimit));
+    setNextCertificateNumber(next.nextCertificateNumber === undefined ? "" : String(next.nextCertificateNumber));
     setError("");
     setMessage(successMessage);
     window.dispatchEvent(new CustomEvent("administration-updated", { detail: next }));
@@ -119,6 +122,11 @@ function Administration() {
     await runAction(() => updateTotalAllocatedSeats(paidSeatLimit, unpaidSeatLimit), "Seat allocation updated successfully.");
   };
 
+  const handleCertificateNumberUpdate = async (event) => {
+    event.preventDefault();
+    await runAction(() => updateNextCertificateNumber(Number(nextCertificateNumber)), "Certificate number updated successfully.");
+  };
+
   const toggleDivisions = async () => {
     if (showDivisions) {
       setShowDivisions(false);
@@ -168,70 +176,81 @@ function Administration() {
       ) : (
         <div className="administration-grid">
           <div className="administration-top-grid">
-          <section className="administration-card administration-card--divisions">
-            <div className="administration-card__heading">
-              <span className="administration-icon" aria-hidden="true">⌘</span>
-              <div><h2>Edit Divisions</h2><p>Maintain the division list used by the portal.</p></div>
-            </div>
-            <form className="administration-add-form" onSubmit={handleAdd}>
-              <label className="admin-field"><span>Division Name</span><input value={divisionName} onChange={(event) => setDivisionName(event.target.value)} placeholder="Enter division name" maxLength="100" /></label>
-              <button className="admin-primary-btn" disabled={saving} type="submit">+ Add Division</button>
-            </form>
-            <button
-              className="division-disclosure-button"
-              type="button"
-              aria-expanded={showDivisions}
-              aria-controls="division-list"
-              onClick={toggleDivisions}
-              disabled={loadingDivisions}
-            >
-              <span className="division-disclosure-button__arrow" aria-hidden="true">▼</span>
-              {loadingDivisions ? "Loading Divisions..." : showDivisions ? "Hide Divisions" : "Display Divisions"}
-            </button>
-            <div className={`division-disclosure ${showDivisions ? "division-disclosure--open" : ""}`}>
-              <div className="division-disclosure__inner">
-                <div className="division-list" id="division-list" aria-live="polite">
-                  {[...administration.divisions].sort((a, b) => a.localeCompare(b)).map((division) => (
-                    <article className="division-row" key={division}>
-                      <span className="division-row__mark" aria-hidden="true">◈</span>
-                      <strong>{division}</strong>
-                      <div className="division-row__actions">
-                        <button className="admin-secondary-btn admin-icon-button" type="button" aria-label={`Edit ${division}`} onClick={() => setEditing({ name: division, value: division })}>✎ <span>Edit</span></button>
-                        <button className="admin-danger-btn admin-icon-button" type="button" aria-label={`Delete ${division}`} onClick={() => setDeleting(division)}>⌫ <span>Delete</span></button>
-                      </div>
-                    </article>
-                  ))}
+            <section className="administration-card administration-card--divisions">
+              <div className="administration-card__heading">
+                <span className="administration-icon" aria-hidden="true">⌘</span>
+                <div><h2>Edit Divisions</h2><p>Maintain the division list used by the portal.</p></div>
+              </div>
+              <form className="administration-add-form" onSubmit={handleAdd}>
+                <label className="admin-field"><span>Division Name</span><input value={divisionName} onChange={(event) => setDivisionName(event.target.value)} placeholder="Enter division name" maxLength="100" /></label>
+                <button className="admin-primary-btn" disabled={saving} type="submit">+ Add Division</button>
+              </form>
+              <button
+                className="division-disclosure-button"
+                type="button"
+                aria-expanded={showDivisions}
+                aria-controls="division-list"
+                onClick={toggleDivisions}
+                disabled={loadingDivisions}
+              >
+                <span className="division-disclosure-button__arrow" aria-hidden="true">▼</span>
+                {loadingDivisions ? "Loading Divisions..." : showDivisions ? "Hide Divisions" : "Display Divisions"}
+              </button>
+              <div className={`division-disclosure ${showDivisions ? "division-disclosure--open" : ""}`}>
+                <div className="division-disclosure__inner">
+                  <div className="division-list" id="division-list" aria-live="polite">
+                    {[...administration.divisions].sort((a, b) => a.localeCompare(b)).map((division) => (
+                      <article className="division-row" key={division}>
+                        <span className="division-row__mark" aria-hidden="true">◈</span>
+                        <strong>{division}</strong>
+                        <div className="division-row__actions">
+                          <button className="admin-secondary-btn admin-icon-button" type="button" aria-label={`Edit ${division}`} onClick={() => setEditing({ name: division, value: division })}>✎ <span>Edit</span></button>
+                          <button className="admin-danger-btn admin-icon-button" type="button" aria-label={`Delete ${division}`} onClick={() => setDeleting(division)}>⌫ <span>Delete</span></button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </section>
-          <section className="administration-card administration-card--seats">
-            <div className="administration-card__heading">
-              <span className="administration-icon" aria-hidden="true">◫</span>
-              <div><h2>Overall Seat Limit</h2><p>Set the portal-wide maximum. Configure separate Paid and Unpaid seats for each division below.</p></div>
-            </div>
-            <form className="seat-allocation-form" onSubmit={handleSeatUpdate}>
-              <label className="admin-field"><span>Paid Seats</span><input type="number" min="0" step="1" inputMode="numeric" value={paidSeatLimit} onChange={(event) => setPaidSeatLimit(event.target.value)} required /></label>
-              <label className="admin-field"><span>Unpaid Seats</span><input type="number" min="0" step="1" inputMode="numeric" value={unpaidSeatLimit} onChange={(event) => setUnpaidSeatLimit(event.target.value)} required /></label>
-              <label className="admin-field"><span>Total Seats</span><input type="number" readOnly value={(Number(paidSeatLimit) || 0) + (Number(unpaidSeatLimit) || 0)} /></label>
-              <button className="admin-primary-btn" disabled={saving} type="submit">Update</button>
-            </form>
-            <div className="future-ready-note"><span aria-hidden="true">✦</span><div><strong>Future-ready configuration</strong><p>Individual division seat limits can be added here without changing the saved configuration structure.</p></div></div>
-            <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
-              <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", textAlign: "center" }}>
-                <span style={{ display: "block", fontSize: "0.85rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>Paid Students</span>
-                <strong style={{ display: "block", fontSize: "1.75rem", color: "var(--primary)", marginTop: "4px" }}>
-                  {students.filter(s => s.status === "Approved" && s.internshipType === "Paid").length}
-                </strong>
+            </section>
+            <section className="administration-card administration-card--seats">
+              <div className="administration-card__heading">
+                <span className="administration-icon" aria-hidden="true">◫</span>
+                <div><h2>Overall Seat Limit</h2><p>Set the portal-wide maximum. Configure separate Paid and Unpaid seats for each division below.</p></div>
               </div>
-              <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", textAlign: "center" }}>
-                <span style={{ display: "block", fontSize: "0.85rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>Unpaid Students</span>
-                <strong style={{ display: "block", fontSize: "1.75rem", color: "var(--primary)", marginTop: "4px" }}>
-                  {students.filter(s => s.status === "Approved" && (s.internshipType === "Unpaid" || !s.internshipType)).length}
-                </strong>
+              <form className="seat-allocation-form" onSubmit={handleSeatUpdate}>
+                <label className="admin-field"><span>Paid Seats</span><input type="number" min="0" step="1" inputMode="numeric" value={paidSeatLimit} onChange={(event) => setPaidSeatLimit(event.target.value)} required /></label>
+                <label className="admin-field"><span>Unpaid Seats</span><input type="number" min="0" step="1" inputMode="numeric" value={unpaidSeatLimit} onChange={(event) => setUnpaidSeatLimit(event.target.value)} required /></label>
+                <label className="admin-field"><span>Total Seats</span><input type="number" readOnly value={(Number(paidSeatLimit) || 0) + (Number(unpaidSeatLimit) || 0)} /></label>
+                <button className="admin-primary-btn" disabled={saving} type="submit">Update</button>
+              </form>
+              <div className="future-ready-note"><span aria-hidden="true">✦</span><div><strong>Future-ready configuration</strong><p>Individual division seat limits can be added here without changing the saved configuration structure.</p></div></div>
+              <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
+                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", textAlign: "center" }}>
+                  <span style={{ display: "block", fontSize: "0.85rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>Paid Students</span>
+                  <strong style={{ display: "block", fontSize: "1.75rem", color: "var(--primary)", marginTop: "4px" }}>
+                    {students.filter(s => s.status === "Approved" && s.internshipType === "Paid").length}
+                  </strong>
+                </div>
+                <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", textAlign: "center" }}>
+                  <span style={{ display: "block", fontSize: "0.85rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>Unpaid Students</span>
+                  <strong style={{ display: "block", fontSize: "1.75rem", color: "var(--primary)", marginTop: "4px" }}>
+                    {students.filter(s => s.status === "Approved" && (s.internshipType === "Unpaid" || !s.internshipType)).length}
+                  </strong>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+
+            <section className="administration-card administration-card--seats">
+              <div className="administration-card__heading">
+                <span className="administration-icon" aria-hidden="true">✎</span>
+                <div><h2>Certificate Number</h2><p>Configure starting or next sequence number of generated internship certificates.</p></div>
+              </div>
+              <form className="seat-allocation-form" onSubmit={handleCertificateNumberUpdate}>
+                <label className="admin-field"><span>Starting/Next Certificate Number</span><input type="number" min="1" step="1" inputMode="numeric" value={nextCertificateNumber} onChange={(event) => setNextCertificateNumber(event.target.value)} required /></label>
+                <button className="admin-primary-btn" disabled={saving} type="submit">Update Number</button>
+              </form>
+            </section>
           </div>
 
           <DivisionBranchVacancyConfiguration key={JSON.stringify(administration.divisionConfigurations)} administration={administration} onSaved={saveDivisionConfiguration} onError={(requestError) => { setMessage(""); setError(requestError); }} />
@@ -246,7 +265,7 @@ function Administration() {
                 <option value="unpaid">Unpaid Internship</option>
               </select>
             </div>
-            
+
             <div className="admin-summary-grid" style={{ width: "100%", margin: "0" }}>
               <div className="admin-summary-card">
                 <span>Total Students</span>

@@ -31,7 +31,8 @@ function certificateFileName(student) {
     return `Certificate_${refId}_${nameNoSpaces}.pdf`;
 }
 
-function generateCertificateHtml(student, renderMode = "full", signatureName = "VAIBHAV GUPTA", signatureDesignation = "TECHNICAL OFFICER 'C'") {
+function generateCertificateHtml(student, renderMode = "full", signatureName = "VAIBHAV GUPTA", signatureDesignation = "TECHNICAL OFFICER 'C'", certNo = "") {
+    const certificateNumberValue = certNo || student.certificateNumber || "";
     const training = student.trainingManagement || {};
     const isPaid = String(student.internshipType || "").trim().toLowerCase() === "paid";
 
@@ -497,11 +498,18 @@ function generateCertificateHtml(student, renderMode = "full", signatureName = "
  
              <!-- Footer Section -->
              <div class="footer-section">
-                 <div class="dated-row">
-                     <span>Dated</span>
-                     <span class="colon">:</span>
-                     <span class="date-val">${escapeHtml(issuedDate)}</span>
-                 </div>
+                  <div class="dated-and-cert-block">
+                      <div class="dated-row">
+                          <span>Dated</span>
+                          <span class="colon">:</span>
+                          <span class="date-val">${escapeHtml(issuedDate)}</span>
+                      </div>
+                      <div class="cert-no-row" style="display: grid; grid-template-columns: 95px 15px 1fr; align-items: center; font-size: 15px; width: 250px; margin-top: 5px;">
+                          <span style="visibility: ${renderMode === 'template' ? 'hidden' : 'visible'};">Certificate No.</span>
+                          <span style="visibility: ${renderMode === 'template' ? 'hidden' : 'visible'};">:</span>
+                          <span class="cert-val" style="font-weight: bold;">${escapeHtml(String(certificateNumberValue || ""))}</span>
+                      </div>
+                  </div>
                 ${renderMode === "template" ? "" : `
                  <div class="signature-block">
                      <div class="signature-line"></div>

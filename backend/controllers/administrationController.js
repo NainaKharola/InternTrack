@@ -239,4 +239,45 @@ async function saveProformaConfig(req, res, next) {
   }
 }
 
-module.exports = { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations, saveProformaConfig };
+async function updateCertificateNumber(req, res, next) {
+  try {
+    const nextCertificateNumber = Number(req.body.nextCertificateNumber);
+    if (!Number.isSafeInteger(nextCertificateNumber) || nextCertificateNumber <= 0) {
+      return respondError(res, "Certificate number must be a positive integer.");
+    }
+    const administration = await getAdministration();
+    administration.nextCertificateNumber = nextCertificateNumber;
+    await saveAdministration(administration);
+
+    await logActivity({
+      req,
+      module: "Administration",
+      action: "Updated Certificate Number",
+      description: `Updated starting/next certificate number to ${nextCertificateNumber}.`,
+      status: "Success",
+    });
+
+    res.json({ success: true, message: "Certificate number updated successfully.", administration });
+  } catch (error) {
+    await logActivity({
+      req,
+      module: "Administration",
+      action: "Updated Certificate Number",
+      description: `Failed to update certificate number. Error: ${error.message}`,
+      status: "Failed",
+    });
+    next(error);
+  }
+}
+
+module.exports = { 
+  getConfiguration, 
+  addDivision, 
+  updateDivision, 
+  deleteDivision, 
+  updateSeats, 
+  getDivisionConfigurations, 
+  saveDivisionConfigurations, 
+  saveProformaConfig,
+  updateCertificateNumber
+};

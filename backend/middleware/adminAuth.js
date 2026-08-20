@@ -3,10 +3,16 @@ const Admin = require("../models/Admin");
 
 async function protectAdmin(req, res, next) {
   try {
-    const authHeader = req.headers.authorization || "";
-    const [scheme, token] = authHeader.split(" ");
+    let token = req.cookies?.token;
+    if (!token) {
+      const authHeader = req.headers.authorization || "";
+      const [scheme, credentials] = authHeader.split(" ");
+      if (scheme === "Bearer" && credentials) {
+        token = credentials;
+      }
+    }
 
-    if (scheme !== "Bearer" || !token) {
+    if (!token) {
       return res.status(401).json({
         success: false,
         message: "Admin authentication required.",

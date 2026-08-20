@@ -153,7 +153,11 @@ function validateRequest(body, files) {
 
 function generateReferenceId() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  return Array.from({ length: 7 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const crypto = require("crypto");
+  return Array.from({ length: 7 }, () => {
+    const index = crypto.randomInt(0, chars.length);
+    return chars[index];
+  }).join("");
 }
 
 async function createUniqueReferenceId() {
@@ -249,7 +253,7 @@ async function createStudent(req, res) {
       });
     }
 
-    const referenceId = await createUniqueReferenceId();
+    const referenceId = req.referenceId || (await createUniqueReferenceId());
     const serialNumber = await getNextSerialNumber();
 
     const student = new Student({
@@ -408,12 +412,18 @@ async function loginStudent(req, res) {
       });
     }
 
-    // Generate JWT token for student
     const token = jwt.sign(
       { id: student._id, role: "student" },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
 
     return res.status(200).json({
       success: true,
@@ -662,12 +672,22 @@ async function uploadCompletedStudentDocuments(req, res) {
   }
 }
 
+async function logoutStudent(req, res) {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+  return res.status(200).json({ success: true, message: "Logged out successfully." });
+}
+
 module.exports = {
   createStudent,
   deleteStudent,
   downloadStudentDocument,
   getStudentDashboard,
   loginStudent,
+  logoutStudent,
   savePaidInternshipProjectDetails,
   uploadCompletedStudentDocuments,
 };

@@ -2,6 +2,7 @@ const express = require("express");
 const {
   getAdminProfile,
   loginAdmin,
+  logoutAdmin,
   registerAdmin,
   changeAdminPassword,
   setupRecoveryInfo,
@@ -37,7 +38,7 @@ const { protectAdmin, requireMainAdmin } = require("../middleware/adminAuth");
 const { ensureApprovedStudent } = require("../middleware/ensureApprovedStudent");
 const { uploadOfferLetter: uploadOfferLetterFile } = require("../middleware/offerLetterUpload");
 const createGyapanRouter = require("./gyapanRoutes");
-const { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations, saveProformaConfig } = require("../controllers/administrationController");
+const { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations, saveProformaConfig, updateCertificateNumber } = require("../controllers/administrationController");
 const { listColleges, createCollege, editCollege, removeCollege } = require("../controllers/collegeController");
 const managementController = require("../controllers/managementController");
 
@@ -45,6 +46,7 @@ const router = express.Router();
 
 router.post("/auth/register", registerAdmin);
 router.post("/auth/login", loginAdmin);
+router.post("/auth/logout", logoutAdmin);
 router.get("/auth/me", protectAdmin, getAdminProfile);
 router.get("/profile", protectAdmin, requireMainAdmin, getAdminProfile);
 router.put("/change-password", protectAdmin, requireMainAdmin, changeAdminPassword);
@@ -68,6 +70,7 @@ router.post("/administration/divisions", protectAdmin, addDivision);
 router.patch("/administration/divisions/:name", protectAdmin, updateDivision);
 router.delete("/administration/divisions/:name", protectAdmin, deleteDivision);
 router.patch("/administration/seats", protectAdmin, updateSeats);
+router.patch("/administration/certificate-number", protectAdmin, updateCertificateNumber);
 router.get("/administration/division-configurations", protectAdmin, getDivisionConfigurations);
 router.put("/administration/division-configurations", protectAdmin, saveDivisionConfigurations);
 router.patch("/administration/proforma", protectAdmin, saveProformaConfig);

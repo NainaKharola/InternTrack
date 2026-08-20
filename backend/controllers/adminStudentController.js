@@ -355,14 +355,22 @@ async function downloadCertificates(req, res) {
     const signatureDesignation = req.body.signatureDesignation || "TECHNICAL OFFICER 'C'";
 
     const student = students[0];
+    const { reserveNextCertificateNumber } = require("../services/administrationService");
+    let certNo = student.certificateNumber;
+    if (deleteAfterDownload) {
+      certNo = await reserveNextCertificateNumber(student._id);
+      student.certificateNumber = certNo;
+    }
+
     console.info("CERTIFICATE STUDENT DATA RECEIVED", {
       studentId: student._id,
       studentName: student.name,
       internshipType: student.internshipType || "Unpaid (legacy/default)",
       trainingManagement: student.trainingManagement,
+      certificateNumber: certNo
     });
     const [pdf] = await generatePdfsFromHtml([
-      generateCertificateHtml(student, renderMode, signatureName, signatureDesignation),
+      generateCertificateHtml(student, renderMode, signatureName, signatureDesignation, certNo),
     ]);
     if (deleteAfterDownload) {
       await Student.findByIdAndUpdate(student._id, {
