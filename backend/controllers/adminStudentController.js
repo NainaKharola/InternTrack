@@ -440,7 +440,8 @@ async function updateStudentReview(req, res) {
     }
 
     if (student.internshipType === "Paid" && req.body.internshipDuration !== undefined) {
-      const duration = normalizePaidDuration(req.body.internshipDuration);
+      const rawDuration = req.body.internshipDuration || student.internshipDuration || "6 Months";
+      const duration = normalizePaidDuration(rawDuration);
       if (!duration) {
         return res.status(400).json({ success: false, message: "Enter a whole number of months for a paid internship." });
       }
@@ -924,7 +925,8 @@ async function updateStudentDetails(req, res) {
     const body = req.body;
 
     if (student.internshipType === "Paid" && body.internshipDuration !== undefined) {
-      const duration = normalizePaidDuration(body.internshipDuration);
+      const rawDuration = body.internshipDuration || student.internshipDuration || "6 Months";
+      const duration = normalizePaidDuration(rawDuration);
       if (!duration) {
         return res.status(400).json({ success: false, message: "Enter a whole number of months for a paid internship." });
       }

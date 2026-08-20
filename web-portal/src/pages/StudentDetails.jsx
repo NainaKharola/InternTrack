@@ -590,7 +590,7 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
 }
 
 function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess, onSaveFailure, onDeleteSuccess, inSplitView, source = "approved" }) {
-  const isApprovedView = source === "approved";
+  const isApprovedView = source === "approved" && !window.location.pathname.startsWith("/admin/student-management");
   const trainingFormSaveRef = useRef(null);
   const [student, setStudent] = useState(null);
   const [divisions, setDivisions] = useState([]);
@@ -891,16 +891,50 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
         </div>
         {!inSplitView && (
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <button
-              className="admin-secondary-btn"
-              type="button"
-              onClick={goBack}
-              style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "220px" }}
-            >
-              {window.location.pathname.startsWith("/admin/student-management")
-                ? "Back to Student Management"
-                : "Back to Approved Students"}
-            </button>
+            {isEditing ? (
+              <>
+                <button
+                  className="admin-primary-btn"
+                  type="button"
+                  onClick={handleSaveDetails}
+                  disabled={editSaving}
+                  style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
+                >
+                  {editSaving ? "Saving..." : "Save Changes"}
+                </button>
+                <button
+                  className="admin-secondary-btn"
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "100px" }}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                {!isApprovedView && (
+                  <button
+                    className="admin-primary-btn"
+                    type="button"
+                    onClick={handleStartEdit}
+                    style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "120px" }}
+                  >
+                    Edit Details
+                  </button>
+                )}
+                <button
+                  className="admin-secondary-btn"
+                  type="button"
+                  onClick={goBack}
+                  style={{ padding: "6px 16px", fontSize: "0.875rem", height: "36px", minWidth: "220px" }}
+                >
+                  {window.location.pathname.startsWith("/admin/student-management")
+                    ? "Back to Student Management"
+                    : "Back to Approved Students"}
+                </button>
+              </>
+            )}
           </div>
         )}
       </header>
@@ -909,17 +943,75 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
         <div className="administration-toast administration-toast--error" style={{ marginBottom: "16px" }} role="alert">
           {editError}
         </div>
-      )}      <DetailGrid
-        title="Personal Details"
-        rows={[
-          ["Name", student.name || "Not Provided"],
-          ["Gender", student.gender || "Not Provided"],
-          ["Date of Birth", student.dob || "Not Provided"],
-          ["Phone Number", student.phone || "Not Provided"],
-          ["Email", student.email || "Not Provided"],
-          ["Aadhaar Number", student.aadhaarNumber || "Not Provided"],
-        ]}
-      />
+      )}      {!isApprovedView && (isEditing ? (
+        <section className="details-section">
+          <h2>Personal Details</h2>
+          <div className="details-grid">
+            <label className="admin-field">
+              <span>Name</span>
+              <input
+                value={editForm.name}
+                onChange={(e) => handleEditChange("name", e.target.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Gender</span>
+              <select
+                value={editForm.gender}
+                onChange={(e) => handleEditChange("gender", e.target.value)}
+              >
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label className="admin-field">
+              <span>Date of Birth</span>
+              <input
+                type="date"
+                value={editForm.dob}
+                onChange={(e) => handleEditChange("dob", e.target.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Phone Number</span>
+              <input
+                type="tel"
+                value={editForm.phone}
+                onChange={(e) => handleEditChange("phone", e.target.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Email</span>
+              <input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => handleEditChange("email", e.target.value)}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Aadhaar Number</span>
+              <input
+                value={editForm.aadhaarNumber}
+                onChange={(e) => handleEditChange("aadhaarNumber", e.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+      ) : (
+        <DetailGrid
+          title="Personal Details"
+          rows={[
+            ["Name", student.name || "Not Provided"],
+            ["Gender", student.gender || "Not Provided"],
+            ["Date of Birth", student.dob || "Not Provided"],
+            ["Phone Number", student.phone || "Not Provided"],
+            ["Email", student.email || "Not Provided"],
+            ["Aadhaar Number", student.aadhaarNumber || "Not Provided"],
+          ]}
+        />
+      ))}
 
       {!isApprovedView && (isEditing ? (
         <section className="details-section">

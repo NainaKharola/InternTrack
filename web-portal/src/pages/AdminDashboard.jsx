@@ -122,6 +122,7 @@ function AdminDashboard() {
   const [saveTrigger, setSaveTrigger] = useState(0);
   const [quarterlySubView, setQuarterlySubView] = useState("menu");
   const [showTypeModal, setShowTypeModal] = useState(false);
+  const [newStudentType, setNewStudentType] = useState("");
   const [proformaQuarterEnding, setProformaQuarterEnding] = useState("");
   const [proformaSection1, setProformaSection1] = useState({
     B_dg_cluster: "", C_dg_cluster: "", D_dg_cluster: "", E_dg_cluster: "", F_dg_cluster: "",
@@ -1165,7 +1166,11 @@ function AdminDashboard() {
     printFrame.contentWindow.focus();
     printFrame.contentWindow.print();
 
-    document.body.removeChild(printFrame);
+    setTimeout(() => {
+      if (printFrame.parentNode) {
+        document.body.removeChild(printFrame);
+      }
+    }, 2000);
   }, [getProformaHtml]);
 
   const getAttendanceReportHtml = useCallback((fromDate, toDate, quarter) => {
@@ -1362,7 +1367,11 @@ function AdminDashboard() {
     printFrame.contentWindow.focus();
     printFrame.contentWindow.print();
 
-    document.body.removeChild(printFrame);
+    setTimeout(() => {
+      if (printFrame.parentNode) {
+        document.body.removeChild(printFrame);
+      }
+    }, 2000);
   }, [getAttendanceReportHtml]);
 
   const updateSection1 = (key, value) => {
@@ -1485,9 +1494,24 @@ function AdminDashboard() {
         if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
           return val;
         }
+        const matchStr = String(val).trim().match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+        if (matchStr) {
+          const day = matchStr[1].padStart(2, '0');
+          const monthStr = matchStr[2].toLowerCase();
+          const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+          const monthIdx = months.indexOf(monthStr);
+          if (monthIdx !== -1) {
+            const month = String(monthIdx + 1).padStart(2, '0');
+            const year = matchStr[3];
+            return `${year}-${month}-${day}`;
+          }
+        }
         const parsed = new Date(val);
         if (!isNaN(parsed.getTime())) {
-          return parsed.toISOString().slice(0, 10);
+          const y = parsed.getFullYear();
+          const m = String(parsed.getMonth() + 1).padStart(2, '0');
+          const d = String(parsed.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
         }
         return val;
       };

@@ -489,7 +489,7 @@ export default function AdminProfile() {
                     </thead>
                     <tbody>
                       {users.map((row, index) => {
-                        const isPermanent = row.email === "naina@gmail.com" || row.email === "vaibhav@gmail.com";
+                        const isPermanent = row.role === "MAIN_ADMIN" || row.email === "naina@gmail.com" || row.email === "vaibhav@gmail.com";
                         return (
                           <tr key={row.id || row.email}>
                             <td>{index + 1}</td>

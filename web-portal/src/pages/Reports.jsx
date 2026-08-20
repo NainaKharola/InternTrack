@@ -240,12 +240,15 @@ function Reports() {
   const exportExcel = () => {
     const csv = [visibleColumns.map(([, label]) => `"${label.replace(/"/g, '""')}"`).join(","), ...sortedRows.map((student, index) => visibleColumns.map(([key]) => `"${String(reportValue(student, key, index)).replace(/"/g, '""')}"`).join(","))].join("\r\n");
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
+    link.href = url;
     link.download = "DRDO-Internship-Report.csv";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1000);
   };
 
   const reportPdf = () => {
@@ -474,10 +477,14 @@ function Reports() {
     printFrame.contentWindow.focus();
     printFrame.contentWindow.print();
 
-    document.body.removeChild(printFrame);
+    setTimeout(() => {
+      if (printFrame.parentNode) {
+        document.body.removeChild(printFrame);
+      }
+    }, 2000);
   };
 
-  const printPdf = async () => {
+  const handlePrintPdf = async () => {
     try {
       const pdfBlob = reportPdf();
       console.log("PDF RESPONSE STATUS: 200");
@@ -499,7 +506,7 @@ function Reports() {
       else downloadPdf();
       return;
     }
-    if (format === "PDF") printPdf();
+    if (format === "PDF") handlePrintPdf();
     else printHtmlReport();
   };
   const checkedFields = selectedFields.length ? selectedFields : REPORT_COLUMNS.map(([key]) => key);

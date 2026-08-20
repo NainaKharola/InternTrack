@@ -675,6 +675,14 @@ async function getForgotPasswordQuestions(req, res) {
     if (!admin) {
       return res.status(404).json({ success: false, message: "Admin not found." });
     }
+    
+    if (Array.isArray(admin.securityQuestions) && admin.securityQuestions.length > 0) {
+      return res.status(200).json({
+        success: true,
+        questions: admin.securityQuestions.map(q => ({ id: q.id, question: q.question }))
+      });
+    }
+
     if (!admin.secretQuestion) {
       return res.status(400).json({ success: false, message: "Admin does not have a secret question set up." });
     }
@@ -691,7 +699,7 @@ async function getForgotPasswordQuestions(req, res) {
 async function resetPasswordQuestions(req, res) {
   try {
     const { email, answers, newPassword, confirmPassword } = req.body;
-    if (!email || !answers || !answers[0] || !newPassword || !confirmPassword) {
+    if (!email || !answers || !answers.length || !newPassword || !confirmPassword) {
       return res.status(400).json({ success: false, message: "All fields are required." });
     }
     if (newPassword.length < 8) {
@@ -706,9 +714,26 @@ async function resetPasswordQuestions(req, res) {
       return res.status(404).json({ success: false, message: "Admin not found." });
     }
     
-    const isMatch = await admin.matchSecretAnswer(answers[0].answer);
-    if (!isMatch) {
-      return res.status(400).json({ success: false, message: "Incorrect answer." });
+    const bcrypt = require("bcryptjs");
+    for (const ans of answers) {
+      if (ans.id === "secret") {
+        if (!admin.secretAnswer) {
+          return res.status(400).json({ success: false, message: "Secret answer is not configured." });
+        }
+        const isMatch = await admin.matchSecretAnswer(ans.answer);
+        if (!isMatch) {
+          return res.status(400).json({ success: false, message: "Incorrect answer." });
+        }
+      } else {
+        const q = (admin.securityQuestions || []).find(x => x.id === ans.id);
+        if (!q) {
+          return res.status(400).json({ success: false, message: "Invalid question ID." });
+        }
+        const isMatch = await bcrypt.compare(ans.answer.trim().toLowerCase(), q.answer);
+        if (!isMatch) {
+          return res.status(400).json({ success: false, message: "Incorrect answer." });
+        }
+      }
     }
     
     admin.password = newPassword;
