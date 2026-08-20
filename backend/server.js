@@ -13,6 +13,16 @@ const collegeRoutes = require("./routes/collegeRoutes");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const pool = require("./db");
+
+pool.query("SELECT NOW()")
+  .then(result => {
+    console.log("PostgreSQL test successful:");
+    console.log(result.rows[0]);
+  })
+  .catch(err => {
+    console.error("PostgreSQL connection failed:", err.message);
+  });
 ["photos", "resumes", "results", "permissionLetters", "aadhaarCards", "offerLetters", "gyapan", "completedDocuments"].forEach((folder) => {
   fs.mkdirSync(path.join(__dirname, "uploads", folder), { recursive: true });
 });

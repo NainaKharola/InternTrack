@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
-const { createLocalModel } = require("../services/localStorageService");
+const { createPostgresModel } = require("../services/postgresStore");
 
-module.exports = createLocalModel("admins.json", {}, {
+module.exports = createPostgresModel("admins.json", {}, {
   async beforeSave(admin) {
     if (admin.password && !admin.password.startsWith("$2")) {
       admin.password = await bcrypt.hash(admin.password, 12);

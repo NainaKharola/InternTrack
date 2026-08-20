@@ -1,6 +1,6 @@
-const { createLocalModel } = require("../services/localStorageService");
+const { createPostgresModel } = require("../services/postgresStore");
 
-module.exports = createLocalModel("students.json", {
+module.exports = createPostgresModel("students.json", {
   status: "Pending",
   offerLetterStatus: "",
   certificateGenerated: false,

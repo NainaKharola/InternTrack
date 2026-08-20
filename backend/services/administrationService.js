@@ -1,7 +1,6 @@
-const fs = require("fs/promises");
 const path = require("path");
+const pool = require("../db");
 
-const filePath = path.join(__dirname, "..", "data", "administration.json");
 const defaultConfiguration = {
   totalAllocatedSeats: 250,
   paidSeatLimit: undefined,
@@ -16,15 +15,20 @@ const defaultConfiguration = {
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
 async function getAdministration() {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
   try {
-    const value = JSON.parse(await fs.readFile(filePath, "utf8"));
+    const res = await pool.query("SELECT data FROM administration LIMIT 1");
+    let value;
+    if (res.rows.length > 0) {
+      value = res.rows[0].data;
+    } else {
+      value = clone(defaultConfiguration);
+      await saveAdministration(value);
+    }
+
     if (!Array.isArray(value.divisions) || !Number.isInteger(value.totalAllocatedSeats)) throw new Error("Invalid administration configuration");
     value.divisions.sort((left, right) => left.localeCompare(right));
     value.divisionConfigurations = value.divisionConfigurations && typeof value.divisionConfigurations === "object" ? value.divisionConfigurations : {};
-    // Legacy installations have only totalAllocatedSeats. Keep it intact and
-    // leave the new type-specific limits unset until an administrator chooses
-    // a split, rather than inventing one.
+    
     value.paidSeatLimit = Number.isSafeInteger(value.paidSeatLimit) && value.paidSeatLimit >= 0 ? value.paidSeatLimit : undefined;
     value.unpaidSeatLimit = Number.isSafeInteger(value.unpaidSeatLimit) && value.unpaidSeatLimit >= 0 ? value.unpaidSeatLimit : undefined;
     value.totalSeatLimit = value.paidSeatLimit !== undefined && value.unpaidSeatLimit !== undefined
@@ -34,9 +38,6 @@ async function getAdministration() {
       const entry = value.divisionConfigurations[division];
       value.divisionConfigurations[division] = {
         allowedBranches: Array.isArray(entry?.allowedBranches) ? entry.allowedBranches : [],
-        // Legacy configurations had one total. Treat it as Unpaid capacity
-        // (the historical/default internship type) until an admin configures
-        // separate Paid seats; no existing allocation is removed or reset.
         paidSeats: Number.isSafeInteger(entry?.paidSeats) && entry.paidSeats >= 0 ? entry.paidSeats : undefined,
         unpaidSeats: Number.isSafeInteger(entry?.unpaidSeats) && entry.unpaidSeats >= 0 ? entry.unpaidSeats : undefined,
         totalVacancy: Number.isSafeInteger(entry?.paidSeats) && entry.paidSeats >= 0 && Number.isSafeInteger(entry?.unpaidSeats) && entry.unpaidSeats >= 0
@@ -60,7 +61,6 @@ async function getAdministration() {
     });
     return value;
   } catch (error) {
-    if (error.code !== "ENOENT" && error.name !== "SyntaxError") throw error;
     const config = clone(defaultConfiguration);
     await saveAdministration(config);
     return config;
@@ -69,10 +69,12 @@ async function getAdministration() {
 
 async function saveAdministration(configuration) {
   configuration.divisions = [...configuration.divisions].sort((left, right) => left.localeCompare(right));
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const temporaryPath = `${filePath}.${process.pid}.tmp`;
-  await fs.writeFile(temporaryPath, `${JSON.stringify(configuration, null, 2)}\n`, "utf8");
-  await fs.rename(temporaryPath, filePath);
+  const res = await pool.query("SELECT id FROM administration LIMIT 1");
+  if (res.rows.length > 0) {
+    await pool.query("UPDATE administration SET data = $1, updated_at = NOW() WHERE id = $2", [configuration, res.rows[0].id]);
+  } else {
+    await pool.query("INSERT INTO administration (data) VALUES ($1)", [configuration]);
+  }
   return configuration;
 }
 

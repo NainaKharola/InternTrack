@@ -1,3 +1,3 @@
-const { createLocalModel } = require("../services/localStorageService");
+const { createPostgresModel } = require("../services/postgresStore");
 
-module.exports = createLocalModel("activityLogs.json");
+module.exports = createPostgresModel("activityLogs.json");
