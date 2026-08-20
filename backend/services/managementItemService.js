@@ -36,6 +36,15 @@ async function read(type) {
     }
   }
 
+  if (type === "courses" || type === "branches") {
+    try {
+      const res = await pool.query(`SELECT id, name FROM ${type} ORDER BY name ASC`);
+      return res.rows;
+    } catch (error) {
+      return (defaults[type] || []).map((name, index) => ({ id: index + 1, name }));
+    }
+  }
+
   const file = fileFor(type); if (!file) throw failure("Invalid management item type.", 404);
   try { const values = JSON.parse(await fs.readFile(file, "utf8")); return Array.isArray(values) ? values : []; }
   catch (error) { if (error.code === "ENOENT") return (defaults[type] || []).map((name, index) => ({ id: index + 1, name })); throw failure(`Unable to read ${labels[type].toLowerCase()} data.`, 500); }
@@ -53,6 +62,24 @@ async function save(type, values) {
     } catch (error) {
       await client.query("ROLLBACK");
       throw failure("Failed to save durations to database.", 500);
+    } finally {
+      client.release();
+    }
+    return;
+  }
+
+  if (type === "courses" || type === "branches") {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`DELETE FROM ${type}`);
+      for (const item of values) {
+        await client.query(`INSERT INTO ${type} (id, name) VALUES ($1, $2)`, [item.id, item.name]);
+      }
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw failure(`Failed to save ${type} to database.`, 500);
     } finally {
       client.release();
     }

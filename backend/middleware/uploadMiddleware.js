@@ -1,4 +1,5 @@
 const multer = require("multer");
+const path = require("path");
 const { saveLocalFile } = require("../services/localStorageService");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -25,7 +26,29 @@ const allowedTypes = {
   aadhaarCard: ["application/pdf", "image/jpeg", "image/jpg", "image/png"],
 };
 
-// Keep validation behaviour intact, then persist accepted files locally.
+const allowedExtensions = [".pdf", ".jpg", ".jpeg", ".png"];
+
+// Check magic bytes / signatures for PDFs & common Images
+function validateFileSignature(buffer, fieldname) {
+  if (!buffer || buffer.length < 4) return false;
+  const hex = buffer.slice(0, 8).toString("hex").toUpperCase();
+  
+  const isPdf = hex.startsWith("25504446"); // %PDF
+  const isJpeg = hex.startsWith("FFD8FF");
+  const isPng = hex.startsWith("89504E47");
+
+  if (fieldname === "resume" || fieldname === "completedDocuments") {
+    return isPdf;
+  }
+  if (fieldname === "photo") {
+    return isJpeg || isPng;
+  }
+  if (["result", "permissionLetter", "aadhaarCard"].includes(fieldname)) {
+    return isPdf || isJpeg || isPng;
+  }
+  return false;
+}
+
 const storage = multer.memoryStorage();
 
 function fileFilter(req, file, cb) {
@@ -41,6 +64,12 @@ function fileFilter(req, file, cb) {
     }
     const displayName = file.fieldname === "resume" ? "Curriculum Vitae" : file.fieldname === "result" ? "Marksheet" : file.fieldname;
     return cb(new Error(`${displayName} has an invalid file type.`));
+  }
+
+  // Check extension sanity
+  const ext = path.extname(file.originalname || "").toLowerCase();
+  if (!allowedExtensions.includes(ext)) {
+    return cb(new Error("File extension not allowed."));
   }
 
   cb(null, true);
@@ -91,18 +120,6 @@ const upload = multer({
 function uploadStudentDocuments(req, res, next) {
   upload(req, res, async (error) => {
     if (error) {
-      if (error instanceof multer.MulterError) {
-        const message =
-          error.code === "LIMIT_FILE_SIZE"
-            ? "Maximum allowed file size is 10 MB."
-            : error.message;
-
-        return res.status(400).json({
-          success: false,
-          message,
-        });
-      }
-
       return res.status(400).json({
         success: false,
         message: error.message,
@@ -113,9 +130,18 @@ function uploadStudentDocuments(req, res, next) {
       const uploadedFiles = {};
 
       if (req.files) {
-        // Pre-validate all file sizes first before starting any upload
+        // Pre-validate sizes & magic signatures first
         for (const fieldName of Object.keys(req.files)) {
           const file = req.files[fieldName][0];
+          
+          // Magic bytes validation
+          if (!validateFileSignature(file.buffer, fieldName)) {
+            return res.status(400).json({
+              success: false,
+              message: `File contents for ${fieldName} do not match the expected file signature.`,
+            });
+          }
+
           if (fieldName === "photo" && file.size > PHOTO_MAX_FILE_SIZE) {
             return res.status(400).json({
               success: false,
@@ -126,13 +152,15 @@ function uploadStudentDocuments(req, res, next) {
 
         const uploadPromises = Object.keys(req.files).map(async (fieldName) => {
           const file = req.files[fieldName][0];
-          const result = await saveLocalFile(file.buffer, uploadFolders[fieldName], file.originalname);
+          // Prevent directory traversal by sanitizing originalname to safe alphanumeric base
+          const cleanName = path.basename(file.originalname).replace(/[^a-zA-Z0-9.-]/g, "_");
+          const result = await saveLocalFile(file.buffer, uploadFolders[fieldName], cleanName);
           return {
             fieldName,
             data: {
               url: result.url,
               public_id: result.filename,
-              originalName: file.originalname,
+              originalName: cleanName,
             },
           };
         });
@@ -140,21 +168,19 @@ function uploadStudentDocuments(req, res, next) {
         const results = await Promise.all(uploadPromises);
         for (const uploadRes of results) {
           uploadedFiles[uploadRes.fieldName] = uploadRes.data;
-          console.log("Uploaded:", uploadRes.data.url);
         }
       }
 
       req.uploadedFiles = uploadedFiles;
-
       next();
     } 
     catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: "File upload failed.",
-      error: err.message,
-    });
-  }
+      return res.status(500).json({
+        success: false,
+        message: "File upload failed.",
+        error: err.message,
+      });
+    }
   });
 }
 
@@ -164,7 +190,10 @@ const completedDocumentsUpload = multer({
     if (file.mimetype !== "application/pdf") {
       return cb(new Error("Completed documents must be uploaded as a single PDF."));
     }
-
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    if (ext !== ".pdf") {
+      return cb(new Error("Completed documents must be a PDF file."));
+    }
     cb(null, true);
   },
   limits: {
@@ -175,14 +204,9 @@ const completedDocumentsUpload = multer({
 function uploadCompletedDocuments(req, res, next) {
   completedDocumentsUpload(req, res, async (error) => {
     if (error) {
-      const message =
-        error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
-          ? "Maximum file size allowed is 10 MB."
-          : error.message;
-
       return res.status(400).json({
         success: false,
-        message,
+        message: error.message,
       });
     }
 
@@ -193,8 +217,17 @@ function uploadCompletedDocuments(req, res, next) {
       });
     }
 
+    // Verify PDF Magic Bytes
+    if (!validateFileSignature(req.file.buffer, "completedDocuments")) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid file content signature. Must be a valid PDF document.",
+      });
+    }
+
     try {
-      const result = await saveLocalFile(req.file.buffer, "completedDocuments", req.file.originalname);
+      const cleanName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9.-]/g, "_");
+      const result = await saveLocalFile(req.file.buffer, "completedDocuments", cleanName);
 
       req.uploadedCompletedDocuments = {
         url: result.url,

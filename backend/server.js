@@ -1,9 +1,18 @@
 require("dotenv").config();
 
+const requiredEnv = ["JWT_SECRET", "DB_PASSWORD", "MAIN_ADMIN_EMAIL"];
+const missingEnv = requiredEnv.filter(key => !process.env[key]);
+if (missingEnv.length > 0) {
+  console.error(`❌ Startup Error: Missing required environment variables: ${missingEnv.join(", ")}`);
+  process.exit(1);
+}
+
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const adminRoutes = require("./routes/adminRoutes");
 const offerLetterRoutes = require("./routes/offerLetterRoutes");
@@ -27,31 +36,47 @@ pool.query("SELECT NOW()")
   fs.mkdirSync(path.join(__dirname, "uploads", folder), { recursive: true });
 });
 
-// ========================
-// Allowed Frontend URLs
-// ========================
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://localhost:5175",
-  "http://localhost:5176",
-  "http://localhost:5177",
-  "https://web-portal-hazel-six.vercel.app",
-];
 
 // ========================
-// CORS Configuration
+// Security Middleware & CORS
 // ========================
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false,
+}));
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { success: false, message: "Too many attempts. Please try again after 15 minutes." }
+});
+
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  message: { success: false, message: "Too many requests. Please try again after 15 minutes." }
+});
+
+app.use("/api/", generalLimiter);
+app.use("/api/admin/auth", authLimiter);
+
+const allowedOrigins = process.env.NODE_ENV === "production"
+  ? ["https://web-portal-hazel-six.vercel.app"]
+  : [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5176",
+    "http://localhost:5177",
+  ];
+
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow Postman, Thunder Client, etc.
       if (!origin) return callback(null, true);
-
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
@@ -62,8 +87,8 @@ app.use(
 // ========================
 // Body Parser
 // ========================
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Admin responses can contain sensitive registration data. Prevent browsers
 // and intermediary caches from restoring an authenticated view after logout.
@@ -109,11 +134,14 @@ app.use((req, res) => {
 // Global Error Handler
 // ========================
 app.use((err, req, res, next) => {
-  console.error(err);
+  if (process.env.NODE_ENV !== "production") {
+    console.error(err);
+  }
 
   res.status(err.statusCode || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
+    ...(process.env.NODE_ENV !== "production" && { stack: err.stack }),
   });
 });
 

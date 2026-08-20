@@ -1,8 +1,4 @@
-const fs = require("fs/promises");
-const path = require("path");
-
-const collegesPath = path.join(__dirname, "..", "data", "colleges.json");
-let writeQueue = Promise.resolve();
+const pool = require("../db");
 
 function normalizeName(name) {
   return String(name || "").trim().replace(/\s+/g, " ");
@@ -20,86 +16,88 @@ function createError(message, statusCode) {
 
 async function readColleges() {
   try {
-    const raw = await fs.readFile(collegesPath, "utf8");
-    const colleges = JSON.parse(raw);
-    if (!Array.isArray(colleges)) throw new Error("College data must be an array.");
-    return colleges
-      .filter((college) => Number.isInteger(college.id) && normalizeName(college.name))
-      .map((college) => ({ id: college.id, name: normalizeName(college.name) }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const res = await pool.query("SELECT id, name FROM colleges ORDER BY name ASC");
+    return res.rows;
   } catch (error) {
-    if (error.code === "ENOENT") return [];
     throw createError(`Unable to read college data: ${error.message}`, 500);
   }
 }
 
 async function saveColleges(colleges) {
-  const directory = path.dirname(collegesPath);
-  const temporaryPath = `${collegesPath}.${process.pid}.${Date.now()}.tmp`;
+  const client = await pool.connect();
   try {
-    await fs.mkdir(directory, { recursive: true });
-    await fs.writeFile(temporaryPath, `${JSON.stringify(colleges, null, 2)}\n`, "utf8");
-    await fs.rename(temporaryPath, collegesPath);
+    await client.query("BEGIN");
+    await client.query("DELETE FROM colleges");
+    for (const c of colleges) {
+      await client.query("INSERT INTO colleges (id, name) VALUES ($1, $2)", [c.id, c.name]);
+    }
+    await client.query("COMMIT");
   } catch (error) {
-    await fs.unlink(temporaryPath).catch(() => {});
+    await client.query("ROLLBACK");
     throw createError(`Unable to save college data: ${error.message}`, 500);
+  } finally {
+    client.release();
   }
 }
 
-function queueMutation(operation) {
-  const result = writeQueue.then(operation, operation);
-  writeQueue = result.catch(() => {});
-  return result;
-}
-
 async function findCollege(id) {
-  const college = (await readColleges()).find((item) => item.id === Number(id));
-  return college || null;
+  try {
+    const res = await pool.query("SELECT id, name FROM colleges WHERE id = $1", [Number(id)]);
+    return res.rows[0] || null;
+  } catch (error) {
+    return null;
+  }
 }
 
-function duplicateExists(colleges, name, exceptId) {
-  const normalized = comparableName(name);
-  return colleges.some((college) => college.id !== exceptId && comparableName(college.name) === normalized);
+async function addCollege(name) {
+  const cleanedName = normalizeName(name);
+  if (!cleanedName) throw createError("College name is required.", 400);
+  try {
+    const checkRes = await pool.query("SELECT 1 FROM colleges WHERE LOWER(name) = LOWER($1)", [cleanedName]);
+    if (checkRes.rows.length > 0) throw createError("College already exists.", 409);
+    
+    const idRes = await pool.query("SELECT COALESCE(MAX(id), 0) as max_id FROM colleges");
+    const id = Number(idRes.rows[0].max_id) + 1;
+    
+    await pool.query("INSERT INTO colleges (id, name) VALUES ($1, $2)", [id, cleanedName]);
+    return { id, name: cleanedName };
+  } catch (error) {
+    if (error.statusCode) throw error;
+    throw createError(`Unable to add college: ${error.message}`, 500);
+  }
 }
 
-function addCollege(name) {
-  return queueMutation(async () => {
-    const cleanedName = normalizeName(name);
-    if (!cleanedName) throw createError("College name is required.", 400);
-    const colleges = await readColleges();
-    if (duplicateExists(colleges, cleanedName)) throw createError("College already exists.", 409);
-    const id = colleges.reduce((maximum, college) => Math.max(maximum, college.id), 0) + 1;
-    const college = { id, name: cleanedName };
-    await saveColleges([...colleges, college]);
-    return college;
-  });
+async function updateCollege(id, name) {
+  const numericId = Number(id);
+  const cleanedName = normalizeName(name);
+  if (!cleanedName) throw createError("College name is required.", 400);
+  try {
+    const collegeRes = await pool.query("SELECT 1 FROM colleges WHERE id = $1", [numericId]);
+    if (collegeRes.rows.length === 0) throw createError("College not found.", 404);
+    
+    const checkRes = await pool.query("SELECT 1 FROM colleges WHERE LOWER(name) = LOWER($1) AND id != $2", [cleanedName, numericId]);
+    if (checkRes.rows.length > 0) throw createError("College already exists.", 409);
+    
+    await pool.query("UPDATE colleges SET name = $1 WHERE id = $2", [cleanedName, numericId]);
+    return { id: numericId, name: cleanedName };
+  } catch (error) {
+    if (error.statusCode) throw error;
+    throw createError(`Unable to update college: ${error.message}`, 500);
+  }
 }
 
-function updateCollege(id, name) {
-  return queueMutation(async () => {
-    const numericId = Number(id);
-    const cleanedName = normalizeName(name);
-    if (!cleanedName) throw createError("College name is required.", 400);
-    const colleges = await readColleges();
-    const index = colleges.findIndex((college) => college.id === numericId);
-    if (index === -1) throw createError("College not found.", 404);
-    if (duplicateExists(colleges, cleanedName, numericId)) throw createError("College already exists.", 409);
-    const college = { ...colleges[index], name: cleanedName };
-    colleges[index] = college;
-    await saveColleges(colleges);
-    return college;
-  });
-}
-
-function deleteCollege(id) {
-  return queueMutation(async () => {
-    const numericId = Number(id);
-    const colleges = await readColleges();
-    const college = colleges.find((item) => item.id === numericId);
-    if (!college) throw createError("College not found.", 404);
-    await saveColleges(colleges.filter((item) => item.id !== numericId));
-    return college;
-  });
+async function deleteCollege(id) {
+  const numericId = Number(id);
+  try {
+    const collegeRes = await pool.query("SELECT id, name FROM colleges WHERE id = $1", [numericId]);
+    if (collegeRes.rows.length === 0) throw createError("College not found.", 404);
+    
+    await pool.query("DELETE FROM colleges WHERE id = $1", [numericId]);
+    return collegeRes.rows[0];
+  } catch (error) {
+    if (error.statusCode) throw error;
+    throw createError(`Unable to delete college: ${error.message}`, 500);
+  }
 }
 
 module.exports = { readColleges, saveColleges, findCollege, addCollege, updateCollege, deleteCollege };

@@ -1,4 +1,5 @@
 const multer = require("multer");
+const path = require("path");
 const { saveLocalFile } = require("../services/localStorageService");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -9,7 +10,10 @@ const upload = multer({
     if (file.mimetype !== "application/pdf") {
       return cb(new Error("Offer Letter must be a PDF file."));
     }
-
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    if (ext !== ".pdf") {
+      return cb(new Error("Offer Letter must have a .pdf extension."));
+    }
     cb(null, true);
   },
   limits: {
@@ -17,17 +21,18 @@ const upload = multer({
   },
 }).single("offerLetter");
 
+function validatePdfSignature(buffer) {
+  if (!buffer || buffer.length < 4) return false;
+  const hex = buffer.slice(0, 4).toString("hex").toUpperCase();
+  return hex === "25504446"; // %PDF
+}
+
 function uploadOfferLetter(req, res, next) {
   upload(req, res, async (error) => {
     if (error) {
-      const message =
-        error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
-          ? "Offer Letter file size must not exceed 10MB."
-          : error.message;
-
       return res.status(400).json({
         success: false,
-        message,
+        message: error.message,
       });
     }
 
@@ -38,8 +43,17 @@ function uploadOfferLetter(req, res, next) {
       });
     }
 
+    // Verify PDF Magic Bytes
+    if (!validatePdfSignature(req.file.buffer)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid file contents. Must be a valid PDF document.",
+      });
+    }
+
     try {
-      const result = await saveLocalFile(req.file.buffer, "offerLetters", req.file.originalname);
+      const cleanName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9.-]/g, "_");
+      const result = await saveLocalFile(req.file.buffer, "offerLetters", cleanName);
 
       req.uploadedOfferLetter = {
         url: result.url,

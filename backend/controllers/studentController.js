@@ -1,6 +1,7 @@
 const Student = require("../models/Student");
 const fs = require("fs/promises");
 const path = require("path");
+const jwt = require("jsonwebtoken");
 const { generatePdfFromHtml } = require("../services/pdfService");
 const { removeLocalFile } = require("../services/localStorageService");
 const { sendRegistrationConfirmationEmail } = require("../services/emailService");
@@ -407,10 +408,18 @@ async function loginStudent(req, res) {
       });
     }
 
+    // Generate JWT token for student
+    const token = jwt.sign(
+      { id: student._id, role: "student" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
     return res.status(200).json({
       success: true,
       message: "Student login successful.",
       student: publicStudent(student),
+      token,
     });
   } catch (error) {
     return res.status(500).json({
@@ -423,12 +432,12 @@ async function loginStudent(req, res) {
 
 async function getStudentDashboard(req, res) {
   try {
-    const student = await findStudentForPortal(req.query.email, req.query.referenceId);
+    const student = req.student;
 
     if (!student) {
       return res.status(401).json({
         success: false,
-        message: "Email address and Reference ID do not match any registration.",
+        message: "Student not found or unauthenticated.",
       });
     }
 
@@ -447,10 +456,10 @@ async function getStudentDashboard(req, res) {
 
 async function savePaidInternshipProjectDetails(req, res) {
   try {
-    const student = await findStudentForPortal(req.body.email, req.body.referenceId);
+    const student = req.student;
 
     if (!student) {
-      return res.status(401).json({ success: false, message: "Email address and Reference ID do not match any registration." });
+      return res.status(401).json({ success: false, message: "Student not found or unauthenticated." });
     }
     if (student.status !== "Approved" || student.internshipType !== "Paid") {
       return res.status(403).json({ success: false, message: "Project details are available only to approved paid-internship students." });
@@ -562,12 +571,12 @@ async function savePaidInternshipProjectDetails(req, res) {
 
 async function downloadStudentDocument(req, res) {
   try {
-    const student = await findStudentForPortal(req.query.email, req.query.referenceId);
+    const student = req.student;
 
     if (!student) {
       return res.status(401).json({
         success: false,
-        message: "Email address and Reference ID do not match any registration.",
+        message: "Student not found or unauthenticated.",
       });
     }
 
@@ -595,8 +604,6 @@ async function downloadStudentDocument(req, res) {
 
     await fs.writeFile("test-document.html", html);
 
-    console.log("HTML WRITTEN");
-    console.log(html.substring(0, 500));
     const pdf = await generatePdfFromHtml(html);
     const filename =
       req.params.type === "declaration"
@@ -608,25 +615,21 @@ async function downloadStudentDocument(req, res) {
     return res.send(pdf);
   } 
   catch (error) {
-    console.error("DOCUMENT ERROR:");
-    console.error(error);
-
     return res.status(500).json({
       success: false,
       message: error.message,
-      stack: error.stack,
     });
   }
 }
 
 async function uploadCompletedStudentDocuments(req, res) {
   try {
-    const student = await findStudentForPortal(req.body.email, req.body.referenceId);
+    const student = req.student;
 
     if (!student) {
       return res.status(401).json({
         success: false,
-        message: "Email address and Reference ID do not match any registration.",
+        message: "Student not found or unauthenticated.",
       });
     }
 

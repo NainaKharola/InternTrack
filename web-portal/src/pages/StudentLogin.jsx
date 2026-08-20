@@ -27,8 +27,11 @@ function StudentLogin() {
         email: form.email.trim().toLowerCase(),
         referenceId: form.referenceId.trim().toUpperCase(),
       };
-      await loginStudent(credentials);
-      setStudentSession(credentials);
+      const response = await loginStudent(credentials);
+      setStudentSession({
+        ...credentials,
+        token: response.token,
+      });
       window.history.pushState({}, "", "/student/dashboard");
       window.dispatchEvent(new PopStateEvent("popstate"));
     } catch (err) {

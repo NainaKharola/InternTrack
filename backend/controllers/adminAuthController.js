@@ -10,7 +10,8 @@ function signToken(admin) {
     throw new Error("JWT_SECRET is not configured.");
   }
 
-  const role = admin.email === "vaibhav.drdo@gmail.com" ? "MAIN_ADMIN" : (admin.role || "SUB_ADMIN");
+  const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+  const role = (admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN") ? "MAIN_ADMIN" : "SUB_ADMIN";
 
   return jwt.sign({ id: admin._id, role }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "1d",
@@ -18,11 +19,13 @@ function signToken(admin) {
 }
 
 function sanitizeAdmin(admin) {
+  const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+  const role = (admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN") ? "MAIN_ADMIN" : "SUB_ADMIN";
   return {
     id: admin._id,
     name: admin.name,
     email: admin.email,
-    role: admin.email === "vaibhav.drdo@gmail.com" ? "MAIN_ADMIN" : (admin.role || "SUB_ADMIN"),
+    role,
     recoverySetup: !!admin.recoverySetup || !!admin.secretQuestion,
     secretQuestion: admin.secretQuestion,
   };
@@ -83,11 +86,6 @@ async function loginAdmin(req, res) {
   try {
     const { email, password } = req.body;
 
-    console.log("=================================");
-    console.log("Login Request");
-    console.log("Email:", email);
-    console.log("Password Entered:", password);
-
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -97,10 +95,7 @@ async function loginAdmin(req, res) {
 
     const admin = await Admin.findOne({ email }).select("+password");
 
-    console.log("Admin Found:", admin);
-
     if (!admin) {
-      console.log("❌ Admin not found.");
       return res.status(401).json({
         success: false,
         message: "Invalid email or password.",
@@ -114,14 +109,9 @@ async function loginAdmin(req, res) {
       });
     }
 
-    console.log("Stored Hash:", admin.password);
-
     const isMatch = await admin.matchPassword(password);
 
-    console.log("Password Match:", isMatch);
-
     if (!isMatch) {
-      console.log("❌ Password does not match.");
       return res.status(401).json({
         success: false,
         message: "Invalid email or password.",
@@ -130,16 +120,12 @@ async function loginAdmin(req, res) {
 
     const token = signToken(admin);
 
-    console.log("✅ Login Successful");
-
     return res.status(200).json({
       success: true,
       admin: sanitizeAdmin(admin),
       token,
     });
   } catch (error) {
-    console.error("LOGIN ERROR:", error);
-
     return res.status(500).json({
       success: false,
       message: error.message || "Unable to login.",
@@ -347,13 +333,14 @@ async function createSubUser(req, res) {
 async function listSubUsers(req, res) {
   try {
     const admins = await Admin.find({});
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
     const sanitized = admins.map(admin => {
-      const isMain = admin.email === "vaibhav.drdo@gmail.com";
+      const isMain = admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN";
       return {
         id: admin._id,
         name: admin.name,
         email: admin.email,
-        role: isMain ? "MAIN_ADMIN" : (admin.role || "SUB_ADMIN"),
+        role: isMain ? "MAIN_ADMIN" : "SUB_ADMIN",
         passwordStatus: admin.password && admin.password.startsWith("$2") ? "Password Created" : "Not Set"
       };
     });
@@ -375,7 +362,8 @@ async function deleteSubUser(req, res) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    const isMain = admin.email === "vaibhav.drdo@gmail.com";
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+    const isMain = admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN";
     if (isMain) {
       return res.status(400).json({ success: false, message: "Permanent Main Administrators cannot be deleted." });
     }
@@ -429,7 +417,8 @@ async function createSubUserPassword(req, res) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    const isMain = admin.email === "naina@gmail.com" || admin.email === "vaibhav@gmail.com";
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+    const isMain = admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN";
     if (isMain && req.admin.email !== admin.email) {
       return res.status(403).json({ success: false, message: "Cannot modify password of other Main Administrators." });
     }

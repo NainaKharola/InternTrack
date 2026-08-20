@@ -50,9 +50,10 @@ async function renderPdf(browser, html) {
   console.info("PUPPETEER PAGE CREATE");
   const page = await browser.newPage();
   try {
-    await page.setBypassCSP(true);
+    page.setDefaultTimeout(30000);
     await page.setContent(html, {
       waitUntil: ["domcontentloaded", "networkidle0"],
+      timeout: 30000,
     });
     console.info("PUPPETEER HTML LOADED");
     await page.emulateMediaType("print");
@@ -73,6 +74,7 @@ async function renderPdf(browser, html) {
       printBackground: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
       preferCSSPageSize: true,
+      timeout: 30000,
     });
     console.info("PUPPETEER PDF GENERATED", { bytes: pdfBuffer.length });
     return Buffer.from(pdfBuffer);

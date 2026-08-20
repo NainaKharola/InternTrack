@@ -45,32 +45,33 @@ export async function loginStudent(credentials) {
 }
 
 export async function fetchStudentDashboard(credentials) {
-  const params = new URLSearchParams(credentials);
-
   const response = await fetch(
-    `${API_URL}/students/dashboard?${params}`
+    `${API_URL}/students/dashboard`,
+    {
+      headers: {
+        "Authorization": `Bearer ${credentials.token}`,
+      }
+    }
   );
 
   return parseResponse(response);
 }
 
 export function studentDocumentUrl(type, credentials) {
-  const params = new URLSearchParams(credentials);
-
-  return `${API_URL}/students/documents/${type}?${params}`;
+  return `${API_URL}/students/documents/${type}?token=${credentials.token}`;
 }
 
 export async function uploadCompletedDocuments(credentials, file) {
   const formData = new FormData();
-
-  formData.append("email", credentials.email);
-  formData.append("referenceId", credentials.referenceId);
   formData.append("completedDocuments", file);
 
   const response = await fetch(
     `${API_URL}/students/completed-documents`,
     {
       method: "POST",
+      headers: {
+        "Authorization": `Bearer ${credentials.token}`,
+      },
       body: formData,
     }
   );
@@ -81,8 +82,11 @@ export async function uploadCompletedDocuments(credentials, file) {
 export async function savePaidInternshipProjectDetails(credentials, details) {
   const response = await fetch(`${API_URL}/students/paid-project-details`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...credentials, ...details }),
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${credentials.token}`,
+    },
+    body: JSON.stringify(details),
   });
 
   return parseResponse(response);

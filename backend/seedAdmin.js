@@ -1,47 +1,43 @@
 require("dotenv").config();
-
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
 const Admin = require("./models/Admin");
 
 async function seedAdmins() {
   try {
-    // Admin 1
-    const admin1 = {
-      name: "Naina",
-      email: "naina@gmail.com",
-      password: "Admin@123",
-    };
-
-    // Admin 2
-    const admin2 = {
-      name: "Vaibhav Gupta",
-      email: "vaibhav@gmail.com",
-      password: "Admin@123",
-    };
-
-    // Check if Naina already exists
-    const existingAdmin1 = await Admin.findOne({ email: admin1.email });
-
-    if (!existingAdmin1) {
-      await Admin.create(admin1);
-      console.log("✅ Naina created.");
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+    
+    // Check if the main admin already exists
+    const existingAdmin = await Admin.findOne({ email: mainAdminEmail });
+    
+    if (!existingAdmin) {
+      // Generate secure random password
+      const plainPassword = crypto.randomBytes(16).toString("hex");
+      
+      const adminData = {
+        name: "Vaibhav Gupta",
+        email: mainAdminEmail,
+        password: plainPassword,
+        role: "MAIN_ADMIN",
+      };
+      
+      await Admin.create(adminData);
+      
+      // Save password to git-ignored text file
+      const passwordFilePath = path.join(__dirname, "seed_password.txt");
+      fs.writeFileSync(passwordFilePath, `Email: ${mainAdminEmail}\nPassword: ${plainPassword}\n`, "utf8");
+      
+      console.log(`✅ Main Admin created successfully.`);
+      console.log(`🔑 Credentials saved securely to: backend/seed_password.txt`);
     } else {
-      console.log("ℹ️ Naina already exists.");
+      console.log(`ℹ️ Main Admin (${mainAdminEmail}) already exists.`);
     }
 
-    // Check if Vaibhav Gupta already exists
-    const existingAdmin2 = await Admin.findOne({ email: admin2.email });
-
-    if (!existingAdmin2) {
-      await Admin.create(admin2);
-      console.log("✅ Vaibhav Gupta created.");
-    } else {
-      console.log("ℹ️ Vaibhav Gupta already exists.");
-    }
-
-    console.log("🎉 Admin seeding completed.");
-    process.exit();
+    console.log("🎉 Seeding check completed.");
+    process.exit(0);
   } catch (error) {
-    console.error(error);
+    console.error("❌ Seeding failed:", error.message);
     process.exit(1);
   }
 }

@@ -1,5 +1,6 @@
 const pool = require("../db");
 const crypto = require("crypto");
+const { encrypt, decrypt } = require("../utils/encryption");
 
 const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 const getValue = (object, key) => key.split(".").reduce((value, part) => value?.[part], object);
@@ -59,15 +60,52 @@ const mapping = {
     "admins.json": { table: "admins", column: "admin_data" },
     "gyapan.json": { table: "gyapan", column: "data" },
     "activityLogs.json": { table: "activity_logs", column: "data" },
-    "durations.json": { table: "durations", column: "data" }
+    "durations.json": { table: "durations", column: "data" },
+    "colleges.json": { table: "colleges", column: "name" }
 };
+
+function encryptDocument(record, fileName) {
+    if (!record) return record;
+    const cloned = clone(record);
+    if (fileName === "students.json") {
+        if (cloned.aadhaarNumber) {
+            cloned.aadhaarNumber = encrypt(cloned.aadhaarNumber);
+        }
+        if (cloned.bankDetails && typeof cloned.bankDetails === "object") {
+            cloned.bankDetails = encrypt(JSON.stringify(cloned.bankDetails));
+        }
+    }
+    return cloned;
+}
+
+function decryptDocument(record, fileName) {
+    if (!record) return record;
+    const cloned = clone(record);
+    if (fileName === "students.json") {
+        if (cloned.aadhaarNumber) {
+            cloned.aadhaarNumber = decrypt(cloned.aadhaarNumber);
+        }
+        if (cloned.bankDetails) {
+            try {
+                const decryptedStr = decrypt(cloned.bankDetails);
+                cloned.bankDetails = JSON.parse(decryptedStr);
+            } catch (e) {
+                // If it starts with '{' but decryption didn't apply, try parsing direct
+                if (typeof cloned.bankDetails === "string" && cloned.bankDetails.trim().startsWith("{")) {
+                    try { cloned.bankDetails = JSON.parse(cloned.bankDetails); } catch (err) {}
+                }
+            }
+        }
+    }
+    return cloned;
+}
 
 async function readTable(fileName) {
     const map = mapping[fileName];
     if (!map) throw new Error("Unknown storage filename: " + fileName);
     try {
         const res = await pool.query(`SELECT ${map.column} FROM ${map.table}`);
-        return res.rows.map(row => row[map.column]);
+        return res.rows.map(row => decryptDocument(row[map.column], fileName));
     } catch (error) {
         console.error(`Error reading from table ${map.table}:`, error);
         return [];
@@ -99,7 +137,7 @@ function createPostgresModel(fileName, defaults = {}, methods = {}) {
         toObject() { return clone(this); }
         async save() {
             if (methods.beforeSave) await methods.beforeSave(this);
-            const record = this.toObject();
+            const record = encryptDocument(this.toObject(), fileName);
             const map = mapping[fileName];
 
             const checkRes = await pool.query(

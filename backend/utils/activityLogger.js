@@ -16,11 +16,8 @@ async function logActivity({ req, module, action, description, status = "Success
     const userId = admin._id || admin.id || "system";
     const userName = admin.name || "System";
     
-    // Resolve role correctly
-    let role = admin.role || "SUB_ADMIN";
-    if (admin.email === "naina@gmail.com" || admin.email === "vaibhav@gmail.com") {
-      role = "MAIN_ADMIN";
-    }
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+    const role = (admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN") ? "MAIN_ADMIN" : "SUB_ADMIN";
 
     await ActivityLog.create({
       userId,
