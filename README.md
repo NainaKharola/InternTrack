@@ -2,377 +2,110 @@
 
 ## Overview
 
-Web Portal is a full-stack web application for managing student internship registrations and administrative workflows.
+Web Portal is a full-stack web application for managing student internship registrations and administrative workflows at Instruments Research & Development Establishment (IRDE), DRDO.
 
-The system provides:
+---
 
-- Student registration and login
-- Admin authentication and dashboard
-- Student reference ID generation
-- Student approval/rejection workflow
-- Internship duration management
-- Recommended By / Division management
-- Training Management
-- Offer Letter generation and management
-- Certificate and document generation
-- ISM / Proforma / Attendance related document workflows
-- Gyapan generation
-- File uploads and cloud storage
-- Email notifications
-- PDF generation from HTML templates
-- Student document/status tracking
+## Technical Features & Architectural Highlights
+
+### 🛡️ Hardened Session Security (HttpOnly Cookies)
+All authentication tokens (for both administrative console and student login sessions) are transmitted and verified using secure, backend-configured **HttpOnly cookies**. This completely shields JWT tokens from cross-site scripting (XSS) attacks. The React frontend is equipped with a global interceptor that handles automated credentials attachment (`credentials: "include"`) for all asynchronous fetch operations.
+
+### 🗄️ Relational Database (PostgreSQL)
+The application metadata layer runs on **PostgreSQL**.
+* Custom abstractions store data schemas securely inside optimized JSONB structures.
+* High-performance indices are automatically created on startup for critical nested parameters (`email`, `status`, `referenceId`) to avoid full table scans.
+
+### 📦 S3-Compatible File Storage (MinIO)
+All uploaded files (student photos, Aadhaar cards, resumes, permission letters, and completed documents) are stored inside a dedicated **MinIO** S3 bucket.
+* The system performs bucket readiness and connectivity checks on server startup.
+* If the bucket is missing, it is dynamically created.
+* Uploaded files are organised under prefix namespaces using the student's unique `referenceId`.
+
+### ✏️ Sequential Certificate Numbering
+A sequential numbering mechanism is integrated into the internship certificate generator:
+* Starting/next sequence number is manually editable under **System Configuration** (`/admin/system-configuration`).
+* The sequence allocation is fully transaction-safe and uses row-level database locks (`SELECT ... FOR UPDATE`) in PostgreSQL to avoid race conditions.
+* Re-downloading or editing an existing certificate does not consume a new number, preventing holes or overlaps in the sequencing.
 
 ---
 
 ## Technology Stack
 
 ### Frontend
-
-- React.js
-- Vite
-- JavaScript / JSX
-- CSS / Tailwind CSS (where used)
+* React.js (built with Vite)
+* JavaScript / JSX
+* Pure CSS
 
 ### Backend
+* Node.js / Express
+* PostgreSQL (driver: `pg`)
+* MinIO / AWS S3 SDK (`@aws-sdk/client-s3`)
+* Cookie Parser (`cookie-parser`)
 
-- Node.js
-- Express.js
-- JavaScript
-- REST APIs
-
-### PDF / Document Generation
-
-- Puppeteer
-- HTML
-- CSS
-
-### Authentication & Security
-
-- JWT (JSON Web Token)
-- bcrypt / bcryptjs
-- dotenv
-- CORS
+### Document Generation
+* Puppeteer (for rendering dynamic HTML certificates, joining ISM gyapans, and offer letters on-the-fly)
 
 ---
 
-## Main Project Structure
+## Installation & Local Development
 
-```text
-Web-Portal/
-│
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   └── ...
-│   ├── package.json
-│   └── ...
-│
-├── backend/
-│   ├── config/
-│   ├── controllers/
-│   ├── middleware/
-│   ├── models/
-│   ├── routes/
-│   ├── services/
-│   ├── templates/
-│   ├── uploads/
-│   ├── server.js
-│   ├── package.json
-│   └── ...
-│
-├── README.md
-└── ...
-```
-
-> Folder names may vary slightly depending on the current project version.
-
----
-
-## Important Dependencies
-
-### Backend Dependencies
-
-The backend uses packages such as:
-
-```text
-express
-cors
-dotenv
-jsonwebtoken
-bcrypt / bcryptjs
-puppeteer
-```
-
-Additional packages may be present depending on the current implementation.
-
-### Frontend Dependencies
-
-The frontend uses packages such as:
-
-```text
-react
-react-dom
-react-router-dom
-vite
-```
-
-Additional UI/helper packages may be present depending on the current implementation.
-
----
-
-## Installation
-
-### 1. Clone / Copy the Project
-
+### 1. Clone the repository
 ```bash
 git clone <repository-url>
 cd Web-Portal
 ```
 
-Or open the existing project folder in VS Code.
-
-### 2. Install Frontend Dependencies
-
-```bash
-cd frontend
-npm install
-```
-
-### 3. Install Backend Dependencies
-
-Open another terminal:
-
-```bash
-cd backend
-npm install
-```
-
----
-
-## Environment Variables
-
-Create a `.env` file inside the backend directory.
-
-Example:
-
+### 2. Configure environment variables
+Create a `.env` file inside the `backend` directory:
 ```env
 PORT=5000
-
 JWT_SECRET=your_jwt_secret
 
+# Database Configuration
+PGUSER=postgres
+PGHOST=localhost
+PGDATABASE=Webportal
+PGPASSWORD=your_postgres_password
+PGPORT=5432
+
+# MinIO Storage Settings
+MINIO_ENDPOINT=127.0.0.1
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=webportal
 ```
 
-Do **not** commit the real `.env` file to GitHub or share it with others.
-
----
-
-## Running the Project Locally
-
-### Start Backend
-
+### 3. Start Backend Development Server
 ```bash
 cd backend
-npm start
-```
-
-If the project uses a development script:
-
-```bash
+npm install
 npm run dev
 ```
-
-The backend normally runs on:
-
-```text
-http://localhost:5000
+On startup, the console will print:
+```bash
+🚀 Server running on port 5000
+✅ MinIO connected
+✅ MinIO bucket ready: webportal
+✅ PostgreSQL connected
+Creating database indexes if not exist...
+✅ Database indexes ready
 ```
 
-### Start Frontend
-
-Open another terminal:
-
+### 4. Start Frontend
 ```bash
-cd frontend
+cd ../web-portal
+npm install
 npm run dev
 ```
-
-Vite normally provides a local URL similar to:
-
-```text
-http://localhost:5173
-```
+The application will launch on **`http://localhost:5173`**.
 
 ---
 
-## Database
-
-The current application uses MongoDB with Mongoose.
-
-The backend connects to MongoDB using the `MONGO_URI` environment variable.
-
-Main database entities include concepts such as:
-
-- Students
-- Admins
-- Student registration details
-- Training Management information
-- Offer Letter information
-- Joined status
-- Recommended By / Division
-- Document information
-
----
-
-## Student Workflow
-
-```text
-Student Registration
-        ↓
-Reference ID Generated
-        ↓
-Admin Reviews Registration
-        ↓
-Approve / Reject
-        ↓
-Training Management
-        ↓
-Joined Status
-        ↓
-Document / Offer Letter Workflows
-        ↓
-Student Portal
-```
-
----
-
-## Admin Features
-
-The admin panel supports functionality including:
-
-- Admin login
-- View students
-- Search students
-- Filter and sort students
-- Approve / reject registrations
-- Add remarks
-- Manage Recommended By / Division
-- Manage student duration
-- Training Management
-- Generate documents
-- Offer Letter management
-- Certificate workflows
-- ISM / Proforma / Attendance workflows
-- Gyapan workflow
-- Student status management
-
----
-
-## Document Generation
-
-The application uses Puppeteer to render HTML/CSS documents and generate PDFs.
-
-The common PDF generation utility is designed to:
-
-1. Launch Puppeteer in headless mode.
-2. Load the required HTML template.
-3. Render the document.
-4. Generate the PDF.
-5. Return the PDF to the application.
-6. Close the Puppeteer browser after generation.
-
-This prevents unnecessary Chrome processes from remaining open after PDF generation.
-
----
-
-## File Uploads
-
-Student documents can be uploaded through the backend using Multer.
-
-Files are stored using Cloudinary where configured.
-
-Examples of uploaded documents include:
-
-- Resume
-- Result
-- Photograph
-- Permission Letter
-- Other internship-related documents
-
----
-
-## Email
-
-The application uses Nodemailer with Gmail OAuth2 for sending emails.
-
-Email functionality can be used for workflows such as:
-
-- Registration confirmation
-- Reference ID communication
-- Offer Letter communication
-- Other student notifications
-
-Required Google OAuth2 credentials must be configured through environment variables.
-
----
-
-## Security
-
-Sensitive configuration must be stored in environment variables.
-
-Never commit:
-
-```text
-.env
-```
-
-or expose:
-
-```text
-Database passwords
-JWT secrets
-API keys
-```
-
----
-
-## Development Notes
-
-Before modifying existing functionality:
-
-1. Check the relevant frontend component.
-2. Check the corresponding backend route/controller.
-3. Check the database model.
-4. Preserve existing APIs and data structures where possible.
-5. Avoid changing existing document layouts unless specifically required.
-6. Test both frontend and backend after changes.
-
----
-
-## Production Deployment
-
-### Frontend
-
-The frontend can be deployed to Vercel.
-
-### Backend
-
-The backend can be deployed to Render.
-
-Production environment variables must be configured separately on the deployment platform.
-
----
-
-## Important
-
-This README describes the current architecture at a high level. The exact dependency versions should always be taken from:
-
-```text
-frontend/package.json
-backend/package.json
-```
-
-The actual `package-lock.json` files should be used when an exact reproducible installation is required.
+## Key Administration Paths
+* **`http://localhost:5173/admin/dashboard`**: Main Admin Console dashboard.
+* **`http://localhost:5173/admin/system-configuration`**: Page to configure seat capacities, edit division categories, and set the **Starting/Next Certificate Number**.
+* **`http://localhost:5173/admin/certificates`**: Batch download, print, or edit authorized signature configurations for student internship certificates.
 
