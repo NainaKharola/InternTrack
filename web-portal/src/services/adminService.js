@@ -94,7 +94,6 @@ export async function deleteAdminStudents(ids) {
 }
 
 export async function downloadAttendanceReportPdf(html) {
-  console.info("ATTENDANCE REPORT GENERATION REQUEST STARTED");
   const response = await fetch(`${API_URL}/attendance-report/pdf`, {
     method: "POST",
     headers: {
@@ -103,16 +102,8 @@ export async function downloadAttendanceReportPdf(html) {
     },
     body: JSON.stringify({ html }),
   });
-  console.info("ATTENDANCE REPORT RESPONSE RECEIVED", {
-    status: response.status,
-    contentType: response.headers.get("content-type"),
-  });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    console.error("ATTENDANCE REPORT GENERATION ERROR", {
-      status: response.status,
-      response: body,
-    });
     throw new Error(body.message || "Failed to generate PDF report.");
   }
   return readDocumentResponse(response);
@@ -174,12 +165,6 @@ export async function downloadCertificates(ids, endpoint = "certificates", rende
     signatureName: signatureName || undefined,
     signatureDesignation: signatureDesignation || undefined,
   };
-  console.info("CERTIFICATE GENERATION REQUEST", {
-    url: `${API_URL}/${endpoint}/download`,
-    method: "POST",
-    studentIds: ids,
-    renderMode: safeRenderMode,
-  });
   const response = await fetch(`${API_URL}/${endpoint}/download`, {
     method: "POST",
     headers: {
@@ -191,10 +176,6 @@ export async function downloadCertificates(ids, endpoint = "certificates", rende
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    console.error("CERTIFICATE GENERATION ERROR", {
-      status: response.status,
-      response: body,
-    });
     if (response.status === 401) clearAdminToken();
     const error = new Error(body.message || "Certificate download failed.");
     error.status = response.status;
@@ -202,10 +183,6 @@ export async function downloadCertificates(ids, endpoint = "certificates", rende
     throw error;
   }
 
-  console.info("CERTIFICATE GENERATION RESPONSE", {
-    status: response.status,
-    contentType: response.headers.get("content-type"),
-  });
   const blob = await readDocumentResponse(response);
   return {
     blob,

@@ -1,6 +1,5 @@
 const multer = require("multer");
 const path = require("path");
-const { saveLocalFile } = require("../services/localStorageService");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -70,6 +69,7 @@ function uploadOfferLetter(req, res, next) {
       req.uploadedOfferLetter = {
         url: result.url,
         publicId: s3Key,
+        filename: result.filename,
       };
 
       next();
@@ -77,7 +77,6 @@ function uploadOfferLetter(req, res, next) {
       return res.status(500).json({
         success: false,
         message: "Offer Letter upload failed.",
-        error: err.message,
       });
     }
   });

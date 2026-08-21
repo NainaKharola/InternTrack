@@ -1,6 +1,5 @@
 const multer = require("multer");
 const path = require("path");
-const { saveLocalFile } = require("../services/localStorageService");
 const { uploadFile } = require("../services/s3StorageService");
 const Student = require("../models/Student");
 const crypto = require("crypto");

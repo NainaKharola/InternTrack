@@ -818,11 +818,6 @@ function AdminDashboard() {
     if (!student) return;
     setDocumentBusy(true); setDocumentError("");
     try {
-      console.info("CERTIFICATE GENERATION REQUEST", {
-        studentId: student._id,
-        studentName: student.name,
-        internshipType: student.internshipType || "Unpaid (legacy/default)",
-      });
       const { blob, filename } = await downloadCertificates(
         [student._id],
         "certificates",
@@ -830,24 +825,10 @@ function AdminDashboard() {
         signature?.name || "",
         signature?.designation || ""
       );
-      console.log("CERTIFICATE RESPONSE:", 200);
-      console.log("CERTIFICATE CONTENT TYPE: application/pdf");
-      console.log("CERTIFICATE DATA TYPE: Blob");
-      console.log("CERTIFICATE BLOB SIZE:", blob.size);
-
       const pdfUrl = await createPdfUrl(blob);
-      console.log("CERTIFICATE PREVIEW URL:", pdfUrl);
 
       setCertificatePreview({ url: pdfUrl, filename });
     } catch (err) {
-      console.error("CERTIFICATE GENERATION ERROR", {
-        studentId: student._id,
-        studentName: student.name,
-        internshipType: student.internshipType || "Unpaid (legacy/default)",
-        status: err.status,
-        response: err.response,
-        error: err,
-      });
       const detail = import.meta.env.DEV ? ` ${err.message}` : "";
       setDocumentError(`Unable to generate certificate for ${student.name}.${detail}`);
     }
@@ -1387,7 +1368,6 @@ function AdminDashboard() {
   };
 
   const generateProformaReport = async () => {
-    console.log("GENERATE REPORT CLICKED");
     if (!proformaFromDate || !proformaToDate) {
       alert("Please select a valid From Date and To Date.");
       return;
@@ -1406,26 +1386,11 @@ function AdminDashboard() {
         toDate: proformaToDate
       });
 
-      console.log("FROM DATE:", proformaFromDate);
-      console.log("TO DATE:", proformaToDate);
       const paidApprovedStudents = response.students.filter(s => s.status === "Approved" && s.internshipType === "Paid");
-      console.log("ALL PAID APPROVED STUDENTS:", paidApprovedStudents);
       const filteredStudents = paidApprovedStudents.filter(s => {
         const joining = s.trainingManagement?.fromDate || "";
         return joining >= proformaFromDate && joining <= proformaToDate;
       });
-      console.log("FILTERED STUDENTS:", filteredStudents);
-      filteredStudents.forEach(student => {
-        const joining = student.trainingManagement?.fromDate || "";
-        console.log({
-          name: student.name,
-          joiningDate: joining,
-          fromDate: proformaFromDate,
-          toDate: proformaToDate,
-          included: true
-        });
-      });
-
       setAllStudents(response.students);
       setProformaGenerated(true);
     } catch (err) {
@@ -1434,7 +1399,6 @@ function AdminDashboard() {
   };
 
   const generateAttendanceReport = async () => {
-    console.log("GENERATE REPORT CLICKED");
     if (!attendanceFromDate || !attendanceToDate) {
       alert("Please select a valid From Date and To Date.");
       return;
@@ -1453,26 +1417,11 @@ function AdminDashboard() {
         toDate: attendanceToDate
       });
 
-      console.log("FROM DATE:", attendanceFromDate);
-      console.log("TO DATE:", attendanceToDate);
       const paidApprovedStudents = response.students.filter(s => s.status === "Approved" && s.internshipType === "Paid");
-      console.log("ALL PAID APPROVED STUDENTS:", paidApprovedStudents);
       const filteredStudents = paidApprovedStudents.filter(s => {
         const joining = s.trainingManagement?.fromDate || "";
         return joining >= attendanceFromDate && joining <= attendanceToDate;
       });
-      console.log("FILTERED STUDENTS:", filteredStudents);
-      filteredStudents.forEach(student => {
-        const joining = student.trainingManagement?.fromDate || "";
-        console.log({
-          name: student.name,
-          joiningDate: joining,
-          fromDate: attendanceFromDate,
-          toDate: attendanceToDate,
-          included: true
-        });
-      });
-
       setAllStudents(response.students);
       setAttendanceGenerated(true);
     } catch (err) {
@@ -1913,16 +1862,10 @@ function AdminDashboard() {
     try {
       if (action !== "skip") {
         const blob = await downloadOfferLetterPdf(studentId);
-        console.log("PDF RESPONSE STATUS: 200");
-        console.log("PDF CONTENT TYPE: application/pdf");
-        console.log("PDF DATA TYPE: Blob");
-        console.log("PDF BLOB SIZE:", blob.size);
-
         if (offerLetterAction === "print") {
           printPdf(blob);
         } else {
           const url = await createPdfUrl(blob);
-          console.log("PDF URL:", url);
           const refId = (student?.referenceId || "UNKNOWN").replace(/[^a-zA-Z0-9_-]/g, "");
           const nameNoSpaces = (student?.name || "Student").replace(/\s+/g, "").replace(/[^a-zA-Z0-9_-]/g, "");
           const link = document.createElement("a");
@@ -2158,50 +2101,6 @@ function AdminDashboard() {
                 </div>
                 <button className="admin-primary-btn" type="button" onClick={generateProformaReport} style={{ height: "auto", padding: "8px 16px" }}>Generate Report</button>
               </div>
-
-              {(() => {
-                const paidStudents = allStudents.filter(s => s.internshipType === "Paid");
-                const paidApprovedStudents = allStudents.filter(s => s.status === "Approved" && s.internshipType === "Paid");
-                console.log("========== PROFORMA DEBUG ==========");
-                console.log("FROM DATE:", proformaFromDate);
-                console.log("TO DATE:", proformaToDate);
-                console.log("ALL STUDENTS:", allStudents.map(s => ({
-                  name: s.name,
-                  status: s.status,
-                  joiningDate: s.trainingManagement?.fromDate
-                })));
-                console.log("PAID STUDENTS:", paidStudents.map(s => ({
-                  name: s.name,
-                  joiningDate: s.trainingManagement?.fromDate
-                })));
-                console.log("APPROVED + PAID STUDENTS:", paidApprovedStudents.map(s => ({
-                  name: s.name,
-                  joiningDate: s.trainingManagement?.fromDate
-                })));
-                console.log("FINAL FILTERED STUDENTS:", proformaStudents.map(s => ({
-                  name: s.name,
-                  joiningDate: s.joiningDate
-                })));
-
-                const testNames = ["Rihan", "Krishna", "Rishi", "Aarvi"];
-                allStudents.forEach(s => {
-                  if (testNames.includes(s.name)) {
-                    const joining = s.trainingManagement?.fromDate || "";
-                    const dateMatches = joining >= proformaFromDate && joining <= proformaToDate;
-                    console.log({
-                      name: s.name,
-                      status: s.status,
-                      paymentType: s.internshipType,
-                      actualJoiningDate: joining,
-                      fromDate: proformaFromDate,
-                      toDate: proformaToDate,
-                      dateMatches,
-                      finalIncluded: proformaStudents.some(p => p._id === s._id)
-                    });
-                  }
-                });
-                return null;
-              })()}
 
               {!proformaGenerated ? (
                 <div style={{ padding: "40px", textAlign: "center", background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0", color: "var(--text-muted)", fontSize: "1.1rem" }}>
@@ -2876,10 +2775,7 @@ function AdminDashboard() {
                   {documentModal === "ism" ? (
                     <iframe id="dashboard-ism-preview" title="ISM preview" className="certificate-preview-frame" srcDoc={currentDocument.html || "<p>Preview unavailable.</p>"} />
                   ) : certificatePreview ? (
-                    (() => {
-                      console.log("CERTIFICATE VIEWER URL:", certificatePreview.url);
-                      return <iframe id="dashboard-certificate-preview" title="Certificate preview" className="certificate-preview-frame" src={certificatePreview.url} />;
-                    })()
+                    <iframe id="dashboard-certificate-preview" title="Certificate preview" className="certificate-preview-frame" src={certificatePreview.url} />
                   ) : (
                     <p className="admin-muted">Prepare this certificate to preview, print, or download it.</p>
                   )}

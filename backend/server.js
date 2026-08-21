@@ -1,6 +1,9 @@
 require("dotenv").config();
 
-const requiredEnv = ["JWT_SECRET", "DB_PASSWORD", "MAIN_ADMIN_EMAIL", "ENCRYPTION_KEY"];
+const requiredEnv = ["JWT_SECRET", "DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD", "MAIN_ADMIN_EMAIL", "ENCRYPTION_KEY"];
+if (process.env.NODE_ENV === "production") {
+  requiredEnv.push("CORS_ORIGINS", "MINIO_ENDPOINT", "MINIO_PORT", "MINIO_REGION", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY", "MINIO_BUCKET");
+}
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length > 0) {
   console.error(`❌ Startup Error: Missing required environment variables: ${missingEnv.join(", ")}`);
@@ -8,7 +11,6 @@ if (missingEnv.length > 0) {
 }
 
 const path = require("path");
-const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -21,6 +23,7 @@ const studentRoutes = require("./routes/studentRoutes");
 const collegeRoutes = require("./routes/collegeRoutes");
 const { protectFileAccess } = require("./middleware/fileAuth");
 const { getFileStream, verifyMinioConnection } = require("./services/s3StorageService");
+const { ensurePostgresSchema } = require("./services/postgresSchema");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,6 +35,7 @@ pool.query("SELECT NOW()")
     console.log("PostgreSQL test successful:");
     console.log(result.rows[0]);
     try {
+      await ensurePostgresSchema();
       console.log("Creating database indexes if not exist...");
       await pool.query("CREATE INDEX IF NOT EXISTS idx_students_email ON students ((student_data->>'email'))");
       await pool.query("CREATE INDEX IF NOT EXISTS idx_students_status ON students ((student_data->>'status'))");
@@ -45,11 +49,6 @@ pool.query("SELECT NOW()")
   .catch(err => {
     console.error("PostgreSQL connection failed:", err.message);
   });
-["photos", "resumes", "results", "permissionLetters", "aadhaarCards", "offerLetters", "gyapan", "completedDocuments"].forEach((folder) => {
-  fs.mkdirSync(path.join(__dirname, "uploads", folder), { recursive: true });
-});
-
-
 // ========================
 // Security Middleware & CORS
 // ========================
@@ -80,15 +79,10 @@ app.use("/api/students", (req, res, next) => {
   next();
 });
 
-const allowedOrigins = process.env.NODE_ENV === "production"
-  ? ["https://web-portal-hazel-six.vercel.app"]
-  : [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:5176",
-    "http://localhost:5177",
-  ];
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
@@ -120,36 +114,27 @@ app.use(["/api/admin", "/api/offer-letter"], (req, res, next) => {
 });
 
 // ========================
-// Static Upload Folder
+// MinIO-backed upload proxy
 // ========================
 app.use("/uploads", protectFileAccess, async (req, res, next) => {
   const relativePath = req.path.replace(/^\/+/, "");
-  const localFilePath = path.join(__dirname, "uploads", relativePath);
-
   try {
-    await fs.promises.access(localFilePath);
+    const stream = await getFileStream(relativePath);
+    const ext = path.extname(relativePath).toLowerCase();
+    const mimeTypes = {
+      ".pdf": "application/pdf",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg"
+    };
+    if (mimeTypes[ext]) {
+      res.setHeader("Content-Type", mimeTypes[ext]);
+    }
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox;");
-    return res.sendFile(localFilePath);
-  } catch (err) {
-    try {
-      const stream = await getFileStream(relativePath);
-      const ext = path.extname(relativePath).toLowerCase();
-      const mimeTypes = {
-        ".pdf": "application/pdf",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg"
-      };
-      if (mimeTypes[ext]) {
-        res.setHeader("Content-Type", mimeTypes[ext]);
-      }
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox;");
-      stream.pipe(res);
-    } catch (s3Err) {
-      next();
-    }
+    stream.pipe(res);
+  } catch (error) {
+    next();
   }
 });
 

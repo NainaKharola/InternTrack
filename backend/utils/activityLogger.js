@@ -16,7 +16,7 @@ async function logActivity({ req, module, action, description, status = "Success
     const userId = admin._id || admin.id || "system";
     const userName = admin.name || "System";
     
-    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL;
     const role = (admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN") ? "MAIN_ADMIN" : "SUB_ADMIN";
 
     await ActivityLog.create({

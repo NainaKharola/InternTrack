@@ -7,7 +7,7 @@ const endpoint = process.env.MINIO_USE_SSL === "true"
 
 const s3Client = new S3Client({
   endpoint,
-  region: "us-east-1",
+  region: process.env.MINIO_REGION,
   credentials: {
     accessKeyId: process.env.MINIO_ACCESS_KEY,
     secretAccessKey: process.env.MINIO_SECRET_KEY,
@@ -17,7 +17,7 @@ const s3Client = new S3Client({
 
 let bucketChecked = false;
 async function verifyMinioConnection() {
-  const bucketName = process.env.MINIO_BUCKET || "webportal";
+  const bucketName = process.env.MINIO_BUCKET;
   try {
     await s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
     console.log("✅ MinIO connected");
@@ -50,7 +50,7 @@ function cleanKey(key) {
 
 async function uploadFile(buffer, key, mimeType) {
   await ensureBucketExists();
-  const bucketName = process.env.MINIO_BUCKET || "webportal";
+  const bucketName = process.env.MINIO_BUCKET;
   const s3Key = cleanKey(key);
   await s3Client.send(new PutObjectCommand({
     Bucket: bucketName,
@@ -66,7 +66,7 @@ async function uploadFile(buffer, key, mimeType) {
 
 async function getFileStream(key) {
   await ensureBucketExists();
-  const bucketName = process.env.MINIO_BUCKET || "webportal";
+  const bucketName = process.env.MINIO_BUCKET;
   const s3Key = cleanKey(key);
   const response = await s3Client.send(new GetObjectCommand({
     Bucket: bucketName,
@@ -78,7 +78,7 @@ async function getFileStream(key) {
 async function deleteFile(key) {
   if (!key) return;
   await ensureBucketExists();
-  const bucketName = process.env.MINIO_BUCKET || "webportal";
+  const bucketName = process.env.MINIO_BUCKET;
   const s3Key = cleanKey(key);
   await s3Client.send(new DeleteObjectCommand({
     Bucket: bucketName,

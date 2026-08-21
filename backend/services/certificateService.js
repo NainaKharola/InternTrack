@@ -529,7 +529,6 @@ function generateCertificateHtml(student, renderMode = "full", signatureName = "
 </body>
 </html>`;
 
-    console.info("CERTIFICATE HTML GENERATED", { studentId: student._id, length: html.length });
     return html;
 }
 

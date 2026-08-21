@@ -322,8 +322,6 @@ async function downloadCertificates(req, res) {
           : [req.body.id].filter(Boolean),
       ),
     ];
-    console.info("CERTIFICATE GENERATION START", { ids, renderMode });
-
     if (!ids.length) {
       return res
         .status(400)
@@ -341,8 +339,6 @@ async function downloadCertificates(req, res) {
       _id: { $in: ids },
       status: "Approved",
     }).lean();
-    console.info("CERTIFICATE STUDENT LOOKUP", { requested: ids.length, found: students.length });
-
     if (students.length !== ids.length) {
       return res.status(400).json({
         success: false,
@@ -362,13 +358,6 @@ async function downloadCertificates(req, res) {
       student.certificateNumber = certNo;
     }
 
-    console.info("CERTIFICATE STUDENT DATA RECEIVED", {
-      studentId: student._id,
-      studentName: student.name,
-      internshipType: student.internshipType || "Unpaid (legacy/default)",
-      trainingManagement: student.trainingManagement,
-      certificateNumber: certNo
-    });
     const [pdf] = await generatePdfsFromHtml([
       generateCertificateHtml(student, renderMode, signatureName, signatureDesignation, certNo),
     ]);
@@ -391,10 +380,9 @@ async function downloadCertificates(req, res) {
       "Content-Disposition",
       `attachment; filename="${certificateFileName(student)}"`,
     );
-    console.info("CERTIFICATE RESPONSE RETURNED", { studentId: student._id, bytes: pdf.length });
     return res.status(200).send(pdf);
   } catch (error) {
-    console.error("CERTIFICATE GENERATION ERROR", { message: error.message, stack: error.stack });
+    console.error("Certificate generation failed:", error.message);
     await logActivity({
       req,
       module: "Certificate",
@@ -694,10 +682,10 @@ async function saveTrainingManagement(req, res) {
     }
 
     const isPaidInternship = student.internshipType === "Paid";
-    const paidTrainingDuration = isPaidInternship && req.body.trainingDuration !== undefined
+    const paidTrainingDuration = isPaidInternship && req.body.trainingDuration !== undefined && req.body.trainingDuration !== ""
       ? normalizePaidDuration(req.body.trainingDuration)
       : "";
-    if (isPaidInternship && req.body.trainingDuration !== undefined && !paidTrainingDuration) {
+    if (isPaidInternship && req.body.trainingDuration !== undefined && req.body.trainingDuration !== "" && !paidTrainingDuration) {
       return res.status(400).json({ success: false, message: "Enter a whole number of months for a paid internship." });
     }
     const resignationStatus = isPaidInternship && req.body.resignationStatus === "Yes" ? "Yes" : "No";

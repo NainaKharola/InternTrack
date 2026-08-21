@@ -487,11 +487,6 @@ function Reports() {
   const handlePrintPdf = async () => {
     try {
       const pdfBlob = reportPdf();
-      console.log("PDF RESPONSE STATUS: 200");
-      console.log("PDF CONTENT TYPE: application/pdf");
-      console.log("PDF DATA TYPE: Blob");
-      console.log("PDF BLOB SIZE:", pdfBlob.size);
-
       printPdf(pdfBlob);
     } catch (err) {
       setError(err.message || "Failed to print PDF report.");

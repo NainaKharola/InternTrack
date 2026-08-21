@@ -2,7 +2,6 @@ const Gyapan = require("../models/Gyapan");
 const Student = require("../models/Student");
 const { generatePdfFromHtml } = require("../services/pdfService");
 const { logActivity } = require("../utils/activityLogger");
-const { saveLocalFile } = require("../services/localStorageService");
 const {
   generateGyapanHtml,
   studentToRow,
@@ -247,8 +246,6 @@ async function generateFinalPdf(req, res) {
     const filename = `Gyapan-${gyapan._id}-${Date.now()}.pdf`;
     const s3Key = `gyapan/${filename}`;
     const upload = await uploadFile(pdf, s3Key, "application/pdf");
-    console.log("UPLOAD OBJECT:", upload);
-    console.log("PDF URL:", upload.url);
     gyapan.generated = true;
     gyapan.generatedDate = new Date();
     gyapan.generatedBy = req.admin.email;

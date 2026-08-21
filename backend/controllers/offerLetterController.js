@@ -5,7 +5,6 @@ const {
   generateOfferLetterHtml,
 } = require("../services/templateService");
 const { generatePdfFromHtml } = require("../services/pdfService");
-const { saveLocalFile } = require("../services/localStorageService");
 const { sendOfferLetterEmail } = require("../services/emailService");
 const { logActivity } = require("../utils/activityLogger");
 
@@ -285,9 +284,6 @@ async function generateOfferLetterPdf(req, res) {
     const html =
       student.offerLetter?.html || (await generateOfferLetterHtml(student));
     const pdfBuffer = await generatePdfFromHtml(html);
-    console.log("PDF Buffer Type:", Buffer.isBuffer(pdfBuffer));
-    console.log("PDF Size:", pdfBuffer.length);
-    console.log("First 10 Bytes:", pdfBuffer.slice(0, 10).toString());
 
     student.offerLetter = {
       ...currentOfferLetter(student),
@@ -341,7 +337,15 @@ async function uploadOfferLetterPdf(req, res) {
       });
     }
 
-    const result = await saveLocalFile(req.file.buffer, "offerLetters", req.file.originalname);
+    const path = require("path");
+    const crypto = require("crypto");
+    const cleanName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9.-]/g, "_");
+    const extension = path.extname(cleanName) || ".pdf";
+    const filename = `${Date.now()}-${crypto.randomBytes(5).toString("hex")}${extension.toLowerCase()}`;
+    const s3Key = `students/${student.referenceId}/offer-letters/${filename}`;
+
+    const { uploadFile } = require("../services/s3StorageService");
+    const result = await uploadFile(req.file.buffer, s3Key, req.file.mimetype);
 
     student.offerLetter = {
       ...currentOfferLetter(student),

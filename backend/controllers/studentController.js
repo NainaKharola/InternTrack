@@ -1,5 +1,4 @@
 const Student = require("../models/Student");
-const fs = require("fs/promises");
 const path = require("path");
 const jwt = require("jsonwebtoken");
 const { generatePdfFromHtml } = require("../services/pdfService");
@@ -611,8 +610,6 @@ async function downloadStudentDocument(req, res) {
     }
 
     const html = await renderTemplate(templateName, buildStudentTemplateData(student));
-
-    await fs.writeFile("test-document.html", html);
 
     const pdf = await generatePdfFromHtml(html);
     const filename =

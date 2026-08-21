@@ -15,19 +15,11 @@ async function responseMessage(response) {
 export async function readDocumentResponse(response, expectedType = "application/pdf") {
   const contentType = response.headers.get("content-type") || "";
 
-  console.info("DOCUMENT RESPONSE", {
-    url: response.url,
-    status: response.status,
-    contentType,
-  });
-
   if (!response.ok) {
     throw new Error(await responseMessage(response));
   }
 
   const blob = await response.blob();
-  console.info("DOCUMENT BLOB", { bytes: blob.size, type: blob.type || contentType });
-
   if (!blob.size) throw new Error("The generated document is empty.");
   if (expectedType && !contentType.toLowerCase().includes(expectedType.toLowerCase())) {
     throw new Error(`The server returned ${contentType || "an unknown format"}, not ${expectedType}.`);

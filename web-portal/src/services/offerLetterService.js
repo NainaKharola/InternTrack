@@ -51,21 +51,12 @@ export async function updateOfferLetter(studentId, payload) {
 }
 
 export async function downloadOfferLetterPdf(studentId) {
-  console.info("OFFER LETTER GENERATION REQUEST STARTED", { studentId });
   const response = await fetch(`${API_URL}/${studentId}/pdf`, {
     method: "POST",
     headers: authHeaders(),
   });
-  console.info("OFFER LETTER RESPONSE RECEIVED", {
-    status: response.status,
-    contentType: response.headers.get("content-type"),
-  });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    console.error("OFFER LETTER GENERATION ERROR", {
-      status: response.status,
-      response: body,
-    });
     if (response.status === 401) clearAdminToken();
     throw new Error(body.message || "Unable to download PDF.");
   }

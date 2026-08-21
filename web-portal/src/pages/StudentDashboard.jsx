@@ -292,9 +292,6 @@ function StudentDashboard() {
       </main>
     );
   }
-  console.log("Student =", student);
-  console.log("Offer Letter =", student.offerLetter);
-  console.log("Offer Letter URL =", student.offerLetterUrl);
   const approved = student.status === "Approved";
 
   return (

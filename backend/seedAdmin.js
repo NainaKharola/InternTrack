@@ -1,7 +1,4 @@
 require("dotenv").config();
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
 const Admin = require("./models/Admin");
 
 async function seedAdmins() {
@@ -16,11 +13,14 @@ async function seedAdmins() {
     const existingAdmin = await Admin.findOne({ email: mainAdminEmail });
     
     if (!existingAdmin) {
-      // Generate secure random password
-      const plainPassword = crypto.randomBytes(16).toString("hex");
+      // The initial password is supplied only through the environment.
+      const plainPassword = process.env.MAIN_ADMIN_INITIAL_PASSWORD;
+      if (!plainPassword) {
+        throw new Error("MAIN_ADMIN_INITIAL_PASSWORD is required when creating the initial admin.");
+      }
       
       const adminData = {
-        name: "Vaibhav Gupta",
+        name: process.env.MAIN_ADMIN_NAME || "Main Administrator",
         email: mainAdminEmail,
         password: plainPassword,
         role: "MAIN_ADMIN",
@@ -28,12 +28,8 @@ async function seedAdmins() {
       
       await Admin.create(adminData);
       
-      // Save password to git-ignored text file
-      const passwordFilePath = path.join(__dirname, "seed_password.txt");
-      fs.writeFileSync(passwordFilePath, `Email: ${mainAdminEmail}\nPassword: ${plainPassword}\n`, "utf8");
-      
+      // Never write credentials to disk.
       console.log(`✅ Main Admin created successfully.`);
-      console.log(`🔑 Credentials saved securely to: backend/seed_password.txt`);
     } else {
       console.log(`ℹ️ Main Admin (${mainAdminEmail}) already exists.`);
     }

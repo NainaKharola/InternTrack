@@ -54,7 +54,7 @@ async function requireMainAdmin(req, res, next) {
     });
   }
 
-  const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+  const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL;
   const role = (req.admin.email === mainAdminEmail || req.admin.role === "MAIN_ADMIN") ? "MAIN_ADMIN" : "SUB_ADMIN";
 
   if (role !== "MAIN_ADMIN") {

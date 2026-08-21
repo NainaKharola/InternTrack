@@ -57,13 +57,6 @@ function SearchableDropdown({
           })
           .map((item) => item.option);
 
-    console.debug("SearchableDropdown filter", {
-      query,
-      optionsLength: options.length,
-      filteredOptionsLength: nextFilteredOptions.length,
-      firstTenFilteredOptions: nextFilteredOptions.slice(0, 10),
-    });
-
     return nextFilteredOptions;
   }, [options, value]);
 

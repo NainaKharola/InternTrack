@@ -36,11 +36,6 @@ function Certificates({ bufferMode = false }) {
   const prepare = async () => {
     if (!currentStudent) return; setBusy(true); setError("");
     try {
-      console.info("CERTIFICATE GENERATION REQUEST", {
-        studentId: currentStudent._id,
-        studentName: currentStudent.name,
-        internshipType: currentStudent.internshipType || "Unpaid (legacy/default)",
-      });
       const { blob, filename } = await downloadCertificates(
         [currentStudent._id],
         endpoint,
@@ -51,14 +46,6 @@ function Certificates({ bufferMode = false }) {
       setPreview({ url: URL.createObjectURL(blob), filename });
     }
     catch (err) {
-      console.error("CERTIFICATE GENERATION ERROR", {
-        studentId: currentStudent._id,
-        studentName: currentStudent.name,
-        internshipType: currentStudent.internshipType || "Unpaid (legacy/default)",
-        status: err.status,
-        response: err.response,
-        error: err,
-      });
       const detail = import.meta.env.DEV ? ` Error: ${err.message}` : "";
       setError(`Unable to generate certificate for ${currentStudent.name}.${detail}`);
     }

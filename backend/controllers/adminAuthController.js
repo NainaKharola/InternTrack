@@ -10,7 +10,7 @@ function signToken(admin) {
     throw new Error("JWT_SECRET is not configured.");
   }
 
-  const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+  const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL;
   const role = (admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN") ? "MAIN_ADMIN" : "SUB_ADMIN";
 
   return jwt.sign({ id: admin._id, role }, process.env.JWT_SECRET, {
@@ -19,7 +19,7 @@ function signToken(admin) {
 }
 
 function sanitizeAdmin(admin) {
-  const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+  const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL;
   const role = (admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN") ? "MAIN_ADMIN" : "SUB_ADMIN";
   return {
     id: admin._id,
@@ -354,7 +354,7 @@ async function createSubUser(req, res) {
 async function listSubUsers(req, res) {
   try {
     const admins = await Admin.find({});
-    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL;
     const sanitized = admins.map(admin => {
       const isMain = admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN";
       return {
@@ -383,7 +383,7 @@ async function deleteSubUser(req, res) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL;
     const isMain = admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN";
     if (isMain) {
       return res.status(400).json({ success: false, message: "Permanent Main Administrators cannot be deleted." });
@@ -438,7 +438,7 @@ async function createSubUserPassword(req, res) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL || "vaibhav.drdo@gmail.com";
+    const mainAdminEmail = process.env.MAIN_ADMIN_EMAIL;
     const isMain = admin.email === mainAdminEmail || admin.role === "MAIN_ADMIN";
     if (isMain && req.admin.email !== admin.email) {
       return res.status(403).json({ success: false, message: "Cannot modify password of other Main Administrators." });

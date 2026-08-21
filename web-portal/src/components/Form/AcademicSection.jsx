@@ -25,8 +25,6 @@ function AcademicSection({ form, errors, onChange }) {
         options.push("Other");
 
         setCollegeOptions(options);
-        console.log(options.slice(0, 20));
-        console.log("Total colleges:", options.length);
       } catch (err) {
         console.error("Error loading colleges:", err);
       }
