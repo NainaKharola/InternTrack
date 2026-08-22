@@ -891,7 +891,4 @@ npm install
 npm run dev
 5. Open the Application
 http://localhost:5173
-
 The application is now ready for local development and testing.
-
-
