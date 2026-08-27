@@ -893,8 +893,3 @@ npm run dev
 http://localhost:5173
 
 The application is now ready for local development and testing.
-
-
-https://chatgpt.com/share/6a880355-4ad4-83ee-a6a9-1050d1545a41
-
-https://chatgpt.com/share/6a8f2ee6-dc10-83ee-b57c-5d035d07fd6c
