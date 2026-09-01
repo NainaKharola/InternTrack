@@ -1,6 +1,6 @@
 import { clearAdminToken, getAdminToken } from "./adminService";
 
-const API_BASE = `${import.meta.env.VITE_API_URL}/admin`;
+const API_BASE = `${import.meta.env.VITE_API_URL || "/api"}/admin`;
 const headers = () => ({ Authorization: `Bearer ${getAdminToken()}`, "Content-Type": "application/json" });
 async function parse(response) { const body = await response.json().catch(() => ({})); if (response.status === 401) clearAdminToken(); if (!response.ok) throw new Error(body.message || "Gyapan request failed."); return body; }
 const apiUrl = (module = "gyapan") => `${API_BASE}/${module}`;

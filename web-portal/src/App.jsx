@@ -63,7 +63,7 @@ function App() {
       <AdminAuthProvider>
         <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", fontFamily: "sans-serif" }}>Loading page...</div>}>
           <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<Navigate to="/paid-internship" replace />} />
             <Route path="/paid-internship" element={<Landing isPaid={true} />} />
             <Route path="/student" element={<Home />} />
             <Route path="/paid-internship/register" element={<Home />} />

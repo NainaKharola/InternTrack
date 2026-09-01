@@ -1,7 +1,7 @@
 import { clearAdminToken, getAdminToken } from "./adminService";
 import { readDocumentResponse } from "./documentFileService";
 
-const API_URL = `${import.meta.env.VITE_API_URL}/offer-letter`;
+const API_URL = `${import.meta.env.VITE_API_URL || "/api"}/offer-letter`;
 
 function authHeaders() {
   const token = getAdminToken();

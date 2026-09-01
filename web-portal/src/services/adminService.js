@@ -1,7 +1,7 @@
 import { createDocumentUrl, readDocumentResponse } from "./documentFileService";
 
 const API_URL =
-`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/admin`;
+  `${import.meta.env.VITE_API_URL || "/api"}/admin`;
 const TOKEN_KEY = "webPortalAdminToken";
 
 export function getAdminToken() {

@@ -1,6 +1,7 @@
 const Student = require("../models/Student");
 const path = require("path");
 const jwt = require("jsonwebtoken");
+const { getCookieOptions } = require("../utils/cookieOptions");
 const { generatePdfFromHtml } = require("../services/pdfService");
 const { removeLocalFile } = require("../services/localStorageService");
 const { sendRegistrationConfirmationEmail } = require("../services/emailService");
@@ -417,12 +418,9 @@ async function loginStudent(req, res) {
       { expiresIn: "1d" }
     );
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+    res.cookie("token", token, getCookieOptions({
       maxAge: 24 * 60 * 60 * 1000 // 1 day
-    });
+    }));
 
     return res.status(200).json({
       success: true,
@@ -670,11 +668,7 @@ async function uploadCompletedStudentDocuments(req, res) {
 }
 
 async function logoutStudent(req, res) {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
+  res.clearCookie("token", getCookieOptions());
   return res.status(200).json({ success: true, message: "Logged out successfully." });
 }
 

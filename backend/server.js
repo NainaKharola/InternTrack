@@ -4,6 +4,9 @@ const requiredEnv = ["JWT_SECRET", "DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD
 if (process.env.NODE_ENV === "production") {
   requiredEnv.push("CORS_ORIGINS", "MINIO_ENDPOINT", "MINIO_PORT", "MINIO_REGION", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY", "MINIO_BUCKET");
 }
+if (process.env.EMAIL_ENABLED === "true") {
+  requiredEnv.push("EMAIL_USER", "MAIL_FROM", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN");
+}
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length > 0) {
   console.error(`❌ Startup Error: Missing required environment variables: ${missingEnv.join(", ")}`);
@@ -26,6 +29,7 @@ const { getFileStream, verifyMinioConnection } = require("./services/s3StorageSe
 const { ensurePostgresSchema } = require("./services/postgresSchema");
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
 
 const pool = require("./db");
@@ -141,7 +145,7 @@ app.use("/uploads", protectFileAccess, async (req, res, next) => {
 // ========================
 // Health Check
 // ========================
-app.get("/", (req, res) => {
+app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
     message: "Student Registration Backend is running",
@@ -155,6 +159,20 @@ app.use("/api/students", studentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/offer-letter", offerLetterRoutes);
 app.use("/api/colleges", collegeRoutes);
+
+// ========================
+// Frontend Static & SPA Fallback
+// ========================
+const frontendDistPath = path.resolve(__dirname, process.env.FRONTEND_DIST_PATH || "../web-portal/dist");
+app.use(express.static(frontendDistPath));
+
+app.use((req, res, next) => {
+  if (req.method === "GET" && !req.path.startsWith("/api")) {
+    return res.sendFile(path.join(frontendDistPath, "index.html"));
+  }
+  next();
+});
+
 // ========================
 // 404 Handler
 // ========================
@@ -192,4 +210,11 @@ app.listen(PORT, async () => {
     // Non-fatal warning at startup; it will fail on demand if bucket is needed
     console.error("❌ MinIO startup check failed:", error.message);
   }
+  try {
+    const { checkChromiumPath } = require("./services/pdfService");
+    await checkChromiumPath();
+  } catch (error) {
+    console.error("❌ Chromium check failed:", error.message);
+  }
+  console.log(`📧 Email service: ${process.env.EMAIL_ENABLED === "true" ? "ENABLED (live delivery)" : "DISABLED (mock mode - logs to ActivityLog)"}`);
 });

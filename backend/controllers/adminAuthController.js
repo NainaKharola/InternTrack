@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const Admin = require("../models/Admin");
 const { logActivity } = require("../utils/activityLogger");
+const { getCookieOptions } = require("../utils/cookieOptions");
 const ActivityLog = require("../models/ActivityLog");
 const { generatePdfFromHtml } = require("../services/pdfService");
 
@@ -125,12 +126,9 @@ async function loginAdmin(req, res) {
 
     const token = signToken(admin);
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+    res.cookie("token", token, getCookieOptions({
       maxAge: 24 * 60 * 60 * 1000 // 1 day
-    });
+    }));
 
     return res.status(200).json({
       success: true,
@@ -211,11 +209,7 @@ async function changeAdminPassword(req, res) {
 }
 
 async function logoutAdmin(req, res) {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
+  res.clearCookie("token", getCookieOptions());
   return res.status(200).json({ success: true, message: "Logged out successfully." });
 }
 

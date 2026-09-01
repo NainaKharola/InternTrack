@@ -1,49 +1,35 @@
 
-async function createBrowser() {
-  const isProduction = process.env.NODE_ENV === "production";
+const puppeteer = require("puppeteer");
 
-  if (isProduction) {
-    const puppeteer = require("puppeteer-core");
-    const chromium = require("@sparticuz/chromium").default || require("@sparticuz/chromium");
-    const executablePath = await chromium.executablePath();
-    console.log("Using Chrome (prod):", executablePath);
-    console.info("PUPPETEER LAUNCH", { environment: "production", executablePath });
-    return puppeteer.launch({
-      executablePath,
-      // Never allow the renderer to create a visible desktop browser window.
-      headless: true,
-      args: [
-        ...chromium.args,
-        "--headless=new",
-        "--window-position=-32000,-32000",
-        "--window-size=1,1",
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-      ],
-    });
-  } else {
-    const puppeteer = require("puppeteer");
-    const executablePath = await puppeteer.executablePath();
-    console.info("PUPPETEER LAUNCH", { environment: "development", executablePath });
-    return puppeteer.launch({
-      // "shell" starts Puppeteer's chrome-headless-shell binary, rather than
-      // a normal Chrome window that can briefly appear on Windows.
-      headless: "shell",
-      executablePath,
-      args: [
-        "--headless=new",
-        "--window-position=-32000,-32000",
-        "--window-size=1,1",
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-first-run",
-        "--no-default-browser-check",
-      ],
-    });
+async function getChromiumPath() {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
+  try {
+    return await puppeteer.executablePath();
+  } catch (err) {
+    return "bundled Chromium";
+  }
+}
+
+async function checkChromiumPath() {
+  const chromiumPath = await getChromiumPath();
+  const source = process.env.PUPPETEER_EXECUTABLE_PATH ? "custom (PUPPETEER_EXECUTABLE_PATH)" : "bundled";
+  console.log(`🌐 Chromium path in use (${source}): ${chromiumPath}`);
+  return chromiumPath;
+}
+
+async function createBrowser() {
+  const options = {
+    headless: "new",
+    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  };
+
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    options.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
+  return puppeteer.launch(options);
 }
 
 async function renderPdf(browser, html) {
@@ -104,4 +90,4 @@ async function generatePdfFromHtml(html) {
   return pdf;
 }
 
-module.exports = { generatePdfFromHtml, generatePdfsFromHtml };
+module.exports = { checkChromiumPath, generatePdfFromHtml, generatePdfsFromHtml };
