@@ -460,3 +460,33 @@ export async function createPdfUrl(response) {
   if (!blob.size) throw new Error("Generated PDF is empty");
   return createDocumentUrl(blob);
 }
+
+export async function exportApplicationsExcel() {
+  const response = await fetch(`${API_URL}/applications/export`, {
+    headers: authHeaders(),
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || "Failed to download applications spreadsheet.");
+  }
+
+  const disposition = response.headers.get("Content-Disposition");
+  let filename = `applications-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  if (disposition && disposition.includes("filename=")) {
+    const match = disposition.match(/filename="?([^"]+)"?/);
+    if (match && match[1]) filename = match[1];
+  }
+
+  const blob = await response.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = downloadUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(downloadUrl);
+}
+

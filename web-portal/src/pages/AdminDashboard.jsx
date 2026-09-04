@@ -15,6 +15,7 @@ import {
   fetchAdministration,
   saveProformaConfig,
   createPdfUrl,
+  exportApplicationsExcel,
 } from "../services/adminService";
 import { createGyapanPreview, generateGyapanPdf } from "../services/gyapanService";
 import { downloadOfferLetterPdf } from "../services/offerLetterService";
@@ -150,6 +151,7 @@ function AdminDashboard() {
   // Original Table & Data States
   const [students, setStudents] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
+  const [isExportingApplications, setIsExportingApplications] = useState(false);
   const [summary, setSummary] = useState({});
   const [administration, setAdministration] = useState(null);
   const [search, setSearch] = useState(() => {
@@ -2397,18 +2399,39 @@ function AdminDashboard() {
       {/* VIEW 2: Student Management (Default List page) */}
       {currentView === "student-management" && (
         <div className="admin-split-layout" style={{ width: "100%", display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
             <h2 style={{ margin: 0 }}>Registered Students</h2>
-            <button
-              className="admin-primary-btn"
-              type="button"
-              onClick={() => {
-                setShowTypeModal(true);
-              }}
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 16px" }}
-            >
-              + New Student
-            </button>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <button
+                className="admin-secondary-btn"
+                type="button"
+                onClick={async () => {
+                  try {
+                    setIsExportingApplications(true);
+                    await exportApplicationsExcel();
+                  } catch (err) {
+                    console.error("Export applications failed:", err);
+                    alert(err.message || "Failed to export applications.");
+                  } finally {
+                    setIsExportingApplications(false);
+                  }
+                }}
+                disabled={isExportingApplications}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 16px" }}
+              >
+                {isExportingApplications ? "Exporting..." : "📊 Export to Excel"}
+              </button>
+              <button
+                className="admin-primary-btn"
+                type="button"
+                onClick={() => {
+                  setShowTypeModal(true);
+                }}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 16px" }}
+              >
+                + New Student
+              </button>
+            </div>
           </div>
 
           {/* Dynamic Summary Cards */}

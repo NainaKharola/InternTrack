@@ -32,6 +32,7 @@ const {
   uploadOfferLetter,
   updateStudentDetails,
   generateReportPdf,
+  exportApplications,
 } = require("../controllers/adminStudentController");
 const { uploadStudentDocuments } = require("../middleware/uploadMiddleware");
 const { protectAdmin, requireMainAdmin } = require("../middleware/adminAuth");
@@ -90,6 +91,7 @@ router.get("/recommended-by-options", protectAdmin, (req, res) => {
   });
 });
 
+router.get("/applications/export", protectAdmin, exportApplications);
 router.get("/students", protectAdmin, getStudents);
 router.get("/certificates/students", protectAdmin, getCertificateStudents);
 router.post("/certificates/download", protectAdmin, downloadCertificates);

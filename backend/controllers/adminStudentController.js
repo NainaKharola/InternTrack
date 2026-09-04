@@ -1194,7 +1194,46 @@ module.exports = {
   updateStudentDetails,
   recommendedByOptions,
   generateReportPdf,
+  exportApplications,
 };
+
+async function exportApplications(req, res) {
+  try {
+    const { generateApplicationsWorkbook } = require("../services/applicationExportService");
+    const today = new Date().toISOString().slice(0, 10);
+    const filename = `applications-${today}.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${filename}"`
+    );
+
+    const { workbook, count } = await generateApplicationsWorkbook();
+
+    await logActivity({
+      req,
+      module: "Student Module",
+      action: "Exported Applications",
+      description: `Exported ${count} student application(s) as Excel (.xlsx).`,
+      status: "Success",
+    });
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error("Export applications error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to export applications.",
+      });
+    }
+  }
+}
 
 async function generateReportPdf(req, res) {
   try {
@@ -1211,3 +1250,4 @@ async function generateReportPdf(req, res) {
     return res.status(500).json({ success: false, message: "Unable to generate PDF.", error: error.message });
   }
 }
+

@@ -51,7 +51,8 @@ pool.query("SELECT NOW()")
     }
   })
   .catch(err => {
-    console.error("PostgreSQL connection failed:", err.message);
+    console.error("❌ PostgreSQL connection failed:", err);
+    process.exit(1);
   });
 // ========================
 // Security Middleware & CORS
@@ -217,4 +218,10 @@ app.listen(PORT, async () => {
     console.error("❌ Chromium check failed:", error.message);
   }
   console.log(`📧 Email service: ${process.env.EMAIL_ENABLED === "true" ? "ENABLED (live delivery)" : "DISABLED (mock mode - logs to ActivityLog)"}`);
+  try {
+    const { initScheduledExport } = require("./services/applicationExportService");
+    initScheduledExport();
+  } catch (error) {
+    console.error("❌ Scheduled export init failed:", error.message);
+  }
 });
