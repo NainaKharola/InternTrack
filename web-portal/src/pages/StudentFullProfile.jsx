@@ -1,13 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { fetchAdminStudent } from "../services/adminService";
-import { getUploadUrl } from "../utils/uploadUrl";
+import { openAdminDocument } from "../utils/openAdminDocument";
 import "../styles/admin.css";
-
-function formatDate(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("en-IN");
-}
 
 function calculateDaysRemaining(toDateStr) {
   if (!toDateStr) return "-";
@@ -49,9 +44,13 @@ function DetailGrid({ title, rows }) {
 function DocumentButton({ label, file }) {
   if (!file?.url) return null;
   return (
-    <a className="admin-secondary-btn admin-link-button" href={getUploadUrl(file.url)} target="_blank" rel="noreferrer">
+    <button
+      className="admin-secondary-btn admin-link-button"
+      type="button"
+      onClick={() => openAdminDocument(file.url).catch((error) => window.alert(error.message))}
+    >
       View {label}
-    </a>
+    </button>
   );
 }
 

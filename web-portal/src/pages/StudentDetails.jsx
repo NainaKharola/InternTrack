@@ -16,6 +16,7 @@ import {
   uploadOfferLetterPdf,
 } from "../services/offerLetterService";
 import { getUploadUrl } from "../utils/uploadUrl";
+import { openAdminDocument } from "../utils/openAdminDocument";
 import { branches as registeredBranchOptions } from "../data/branches";
 import { internshipDurations } from "../data/internshipDurations";
 import { sortDurations } from "../utils/durationSort";
@@ -93,9 +94,13 @@ function DocumentButton({ label, file }) {
   if (!file?.url) return null;
 
   return (
-    <a className="admin-secondary-btn admin-link-button" href={getUploadUrl(file.url)} target="_blank" rel="noreferrer">
+    <button
+      className="admin-secondary-btn admin-link-button"
+      type="button"
+      onClick={() => openAdminDocument(file.url).catch((error) => window.alert(error.message))}
+    >
       View {label}
-    </a>
+    </button>
   );
 }
 

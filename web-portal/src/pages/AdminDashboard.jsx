@@ -6,6 +6,7 @@ import SortControls from "../components/Admin/SortControls";
 import StudentTable from "../components/Admin/StudentTable";
 import {
   clearAdminToken,
+  getAdminToken,
   deleteAdminStudents,
   downloadCertificates,
   fetchAdminStudents,
@@ -19,7 +20,7 @@ import {
 } from "../services/adminService";
 import { createGyapanPreview, generateGyapanPdf } from "../services/gyapanService";
 import { downloadOfferLetterPdf } from "../services/offerLetterService";
-import { printPdf } from "../services/documentFileService";
+import { downloadDocument, printPdf, readDocumentResponse } from "../services/documentFileService";
 import { getUploadUrl } from "../utils/uploadUrl";
 import { useAdminAuth } from "../auth/useAdminAuth";
 import StudentForm from "../components/Form/StudentForm";
@@ -881,17 +882,16 @@ function AdminDashboard() {
     setDocumentBusy(true); setDocumentError("");
     try {
       const result = await generateGyapanPdf(item.gyapan._id);
-      const response = await fetch(getUploadUrl(result.pdfUrl));
-      const blob = await response.blob();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
+      const token = getAdminToken();
+      const response = await fetch(getUploadUrl(result.pdfUrl), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const blob = await readDocumentResponse(response);
       const firstStudentId = item.gyapan.selectedStudents?.[0];
       const student = allStudents.find((s) => s._id === firstStudentId) || {};
       const refId = student.referenceId || "UNKNOWN";
       const nameNoSpaces = (student.name || "Student").replace(/\s+/g, "");
-      link.download = `ISM_${refId}_${nameNoSpaces}.pdf`;
-      link.click();
-      URL.revokeObjectURL(link.href);
+      downloadDocument(blob, `ISM_${refId}_${nameNoSpaces}.pdf`);
 
       const studentIds = item.gyapan.selectedStudents || [];
       if (studentIds.length) {
