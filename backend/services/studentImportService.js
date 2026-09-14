@@ -63,9 +63,18 @@ function normalizeBranch(branch) {
   const raw = branch.trim();
   if (!raw || raw === "-" || raw.toLowerCase() === "null" || raw.toLowerCase() === "undefined") return "";
 
+  // 1. Direct exact match
   const exact = standardBranches.find(b => b.toLowerCase() === raw.toLowerCase());
   if (exact) return exact;
 
+  // Check if string contains branch in parentheses, e.g. "B.Tech (CSE)" or "B.E (ECE)"
+  const matchParen = raw.match(/\(([^)]+)\)/);
+  if (matchParen && matchParen[1]) {
+    const inside = normalizeBranch(matchParen[1]);
+    if (inside && inside !== matchParen[1].trim()) return inside;
+  }
+
+  // 2. Clean extraneous branch codes or numbers in parentheses / brackets like (01), [CSE]
   let clean = raw
     .replace(/\s*\([0-9a-zA-Z\s_-]+\)\s*/g, " ")
     .replace(/\s*\[[0-9a-zA-Z\s_-]+\]\s*/g, " ")
@@ -77,93 +86,63 @@ function normalizeBranch(branch) {
 
   const lower = (clean || raw).toLowerCase();
 
-  if (
-    lower === "01" ||
-    lower === "cs" ||
-    lower === "cse" ||
-    lower.includes("computer") ||
-    lower.includes("comp sci") ||
-    lower.includes("software")
-  ) {
+  // 3. Exact word-boundary match for standard branches
+  if (/\b(cse|comp(uter)?\s*sci(ence)?(\s*and\s*eng(ineering)?)?|software(\s*eng(ineering)?)?)\b/i.test(lower)) {
     return "Computer Science and Engineering";
   }
 
-  if (
-    lower === "02" ||
-    lower === "it" ||
-    lower.includes("information tech") ||
-    lower.includes("info tech")
-  ) {
+  if (/\b(it|info(rmation)?\s*tech(nology)?)\b/i.test(lower)) {
     return "Information Technology";
   }
 
-  if (
-    lower === "03" ||
-    lower === "04" ||
-    lower === "ece" ||
-    lower === "ec" ||
-    lower.includes("electronics") ||
-    lower.includes("telecom") ||
-    lower.includes("communication")
-  ) {
+  if (/\b(ece|telecom(munication)?|electronics(\s*and\s*comm(unication)?)?)\b/i.test(lower)) {
     return "Electronics and Communication";
   }
 
-  if (
-    lower === "05" ||
-    lower === "ee" ||
-    lower === "eee" ||
-    lower.includes("electrical")
-  ) {
+  if (/\b(eee?|electrical(\s*engineering)?)\b/i.test(lower)) {
     return "Electrical Engineering";
   }
 
-  if (
-    lower === "06" ||
-    lower === "me" ||
-    lower === "mech" ||
-    lower.includes("mechanical")
-  ) {
+  if (/\b(me|mech(anical)?(\s*engineering)?)\b/i.test(lower)) {
     return "Mechanical Engineering";
   }
 
-  if (
-    lower === "07" ||
-    lower === "ce" ||
-    lower === "civil" ||
-    lower.includes("civil")
-  ) {
+  if (/\b(ce|civil(\s*engineering)?)\b/i.test(lower)) {
     return "Civil Engineering";
   }
 
-  if (
-    lower === "08" ||
-    lower === "ae" ||
-    lower.includes("aero") ||
-    lower.includes("space")
-  ) {
+  if (/\b(ae|aero(space)?(\s*engineering)?)\b/i.test(lower)) {
     return "Aerospace Engineering";
   }
 
-  if (
-    lower === "09" ||
-    lower === "ai" ||
-    lower === "aids" ||
-    lower === "ai&ds" ||
-    lower === "ds" ||
-    lower.includes("artificial intelligence") ||
-    lower.includes("data science")
-  ) {
+  if (/\b(ai|ds|aids|ai&ds|data\s*science|artificial\s*intelligence)\b/i.test(lower)) {
     return "Artificial Intelligence and Data Science";
   }
 
+  // 4. Case-insensitive standard branch match
   for (const std of standardBranches) {
-    if (std.toLowerCase().includes(lower) || lower.includes(std.toLowerCase())) {
+    if (std.toLowerCase() === lower) {
       return std;
     }
   }
 
+  // 5. Fallback: preserve original string cleanly
   return clean || raw;
+}
+
+function extractBranchFromCourse(courseStr) {
+  if (!courseStr || typeof courseStr !== "string") return "";
+  const matchParen = courseStr.match(/\(([^)]+)\)/);
+  if (matchParen && matchParen[1]) {
+    const extracted = normalizeBranch(matchParen[1]);
+    if (extracted) return extracted;
+  }
+  const matchDash = courseStr.match(/[-:]\s*([A-Za-z0-9\s&_]+)$/);
+  if (matchDash && matchDash[1]) {
+    const extracted = normalizeBranch(matchDash[1]);
+    if (extracted) return extracted;
+  }
+  return "";
 }
 
 /**
@@ -181,55 +160,74 @@ async function importStudentsFromExcel(buffer, options = {}) {
     throw new Error("The uploaded Excel workbook contains no worksheets.");
   }
 
-  const headerRow = worksheet.getRow(1);
-  const columnMap = {};
+  // Dynamically locate the header row in rows 1..5
+  let headerRowNumber = 1;
+  let columnMap = {};
+  let maxMatchedColumns = 0;
 
-  headerRow.eachCell((cell, colNumber) => {
-    const val = normalizeHeader(cell.value);
-    if (!val) return;
+  for (let r = 1; r <= Math.min(5, worksheet.rowCount); r++) {
+    const row = worksheet.getRow(r);
+    const candidateMap = {};
 
-    if (val.includes("referenceid") || val.includes("applicationid") || val.includes("appid") || val === "refid" || (val.includes("id") && !val.includes("email") && !val.includes("guide"))) {
-      columnMap.referenceId = colNumber;
-    } else if (val.includes("collegelocation") || val.includes("collegeaddress") || (val.includes("location") && !val.includes("name")) || val === "address" || val.includes("city")) {
-      columnMap.collegeLocation = colNumber;
-    } else if (val.includes("collegename") || val.includes("college") || val.includes("institution") || val.includes("university")) {
-      columnMap.collegeName = colNumber;
-    } else if (val.includes("branch") || val.includes("department") || val.includes("discipline")) {
-      columnMap.branch = colNumber;
-    } else if (val.includes("coursename") || val.includes("course") || val.includes("degree")) {
-      columnMap.course = colNumber;
-    } else if (val.includes("courseyear") || val.includes("year") || val.includes("semester") || val.includes("sem")) {
-      columnMap.year = colNumber;
-    } else if (val.includes("studentname") || val.includes("fullname") || (val.includes("name") && !val.includes("college") && !val.includes("course") && !val.includes("guide"))) {
-      columnMap.name = colNumber;
-    } else if (val.includes("email") || val.includes("mail")) {
-      columnMap.email = colNumber;
-    } else if (val.includes("phone") || val.includes("mobile") || val.includes("contact")) {
-      columnMap.phone = colNumber;
-    } else if (val === "gender" || val === "sex") {
-      columnMap.gender = colNumber;
-    } else if (val === "dob" || val.includes("dateofbirth") || val.includes("birthdate")) {
-      columnMap.dob = colNumber;
-    } else if (val === "cgpa" || val === "gpa" || val.includes("percentage") || val.includes("marks")) {
-      columnMap.cgpa = colNumber;
-    } else if (val.includes("duration") || val.includes("period")) {
-      columnMap.duration = colNumber;
-    } else if (val.includes("division") || val.includes("lab") || val.includes("allotteddivision")) {
-      columnMap.division = colNumber;
-    } else if (val.includes("seatnumber") || val.includes("seatno") || val.includes("seat")) {
-      columnMap.seatNumber = colNumber;
-    } else if (val === "sno" || val === "slno" || val === "serialnumber") {
-      columnMap.serialNumber = colNumber;
-    } else if (val.includes("status") && !val.includes("resignation") && !val.includes("joined") && !val.includes("completed")) {
-      columnMap.status = colNumber;
-    } else if (val.includes("internshiptype") || val === "type") {
-      columnMap.internshipType = colNumber;
-    } else if (val.includes("fromdate") || val.includes("joiningdate") || val.includes("startdate")) {
-      columnMap.fromDate = colNumber;
-    } else if (val.includes("todate") || val.includes("completiondate") || val.includes("enddate")) {
-      columnMap.toDate = colNumber;
+    row.eachCell((cell, colNumber) => {
+      const val = normalizeHeader(cell.value);
+      if (!val) return;
+
+      if (val.includes("referenceid") || val.includes("applicationid") || val.includes("appid") || val === "refid" || (val.includes("id") && !val.includes("email") && !val.includes("guide") && !val.includes("college") && !val.includes("branch"))) {
+        candidateMap.referenceId = colNumber;
+      } else if (val.includes("collegelocation") || val.includes("collegeaddress") || (val.includes("location") && !val.includes("name")) || val === "address" || val.includes("city")) {
+        candidateMap.collegeLocation = colNumber;
+      } else if (val.includes("collegename") || val.includes("college") || val.includes("institution") || val.includes("university")) {
+        candidateMap.collegeName = colNumber;
+      } else if (
+        (val.includes("branch") || val.includes("department") || val.includes("dept") || val.includes("discipline") || val.includes("stream") || val.includes("trade") || val.includes("specialization") || val.includes("major") || val.includes("field")) &&
+        !val.includes("code") && !val.includes("id")
+      ) {
+        candidateMap.branch = colNumber;
+      } else if (val.includes("branchcode") || val.includes("branchid") || (val.includes("code") && val.includes("branch"))) {
+        candidateMap.branchCode = colNumber;
+      } else if (val.includes("coursename") || val === "course" || val.includes("degree") || val.includes("program") || val.includes("programme")) {
+        candidateMap.course = colNumber;
+      } else if (val.includes("courseyear") || val.includes("year") || val.includes("semester") || val.includes("sem")) {
+        candidateMap.year = colNumber;
+      } else if (val.includes("studentname") || val.includes("fullname") || (val.includes("name") && !val.includes("college") && !val.includes("course") && !val.includes("guide") && !val.includes("branch") && !val.includes("bank") && !val.includes("father"))) {
+        candidateMap.name = colNumber;
+      } else if (val.includes("email") || val.includes("mail")) {
+        candidateMap.email = colNumber;
+      } else if (val.includes("phone") || val.includes("mobile") || val.includes("contact")) {
+        candidateMap.phone = colNumber;
+      } else if (val === "gender" || val === "sex") {
+        candidateMap.gender = colNumber;
+      } else if (val === "dob" || val.includes("dateofbirth") || val.includes("birthdate") || val.includes("birth")) {
+        candidateMap.dob = colNumber;
+      } else if (val === "cgpa" || val === "gpa" || val.includes("percentage") || val.includes("marks") || val.includes("percent")) {
+        candidateMap.cgpa = colNumber;
+      } else if (val.includes("duration") || val.includes("period")) {
+        candidateMap.duration = colNumber;
+      } else if (val.includes("division") || val.includes("lab") || val.includes("allotteddivision")) {
+        candidateMap.division = colNumber;
+      } else if (val.includes("seatnumber") || val.includes("seatno") || val.includes("seat")) {
+        candidateMap.seatNumber = colNumber;
+      } else if (val === "sno" || val === "slno" || val === "serialnumber" || val === "srno") {
+        candidateMap.serialNumber = colNumber;
+      } else if (val === "status" || (val.includes("status") && !val.includes("resignation") && !val.includes("joined") && !val.includes("completed") && !val.includes("offer"))) {
+        candidateMap.status = colNumber;
+      } else if (val.includes("internshiptype") || val === "type") {
+        candidateMap.internshipType = colNumber;
+      } else if (val.includes("fromdate") || val.includes("joiningdate") || val.includes("startdate")) {
+        candidateMap.fromDate = colNumber;
+      } else if (val.includes("todate") || val.includes("completiondate") || val.includes("enddate")) {
+        candidateMap.toDate = colNumber;
+      }
+    });
+
+    const matchCount = Object.keys(candidateMap).length;
+    if (matchCount > maxMatchedColumns) {
+      maxMatchedColumns = matchCount;
+      columnMap = candidateMap;
+      headerRowNumber = r;
     }
-  });
+  }
 
   const summary = {
     total: 0,
@@ -241,7 +239,7 @@ async function importStudentsFromExcel(buffer, options = {}) {
   const errors = [];
 
   const rowCount = worksheet.rowCount;
-  for (let rowNumber = 2; rowNumber <= rowCount; rowNumber++) {
+  for (let rowNumber = headerRowNumber + 1; rowNumber <= rowCount; rowNumber++) {
     const row = worksheet.getRow(rowNumber);
     if (!row || row.cellCount === 0) continue;
 
@@ -276,6 +274,19 @@ async function importStudentsFromExcel(buffer, options = {}) {
         existingStudent = await Student.findOne({ email });
       }
 
+      // Resolve branch: check branch cell first, then course extraction, then branchCode
+      let resolvedBranch = "";
+      if (isNonEmptyValue(rowValues.branch)) {
+        resolvedBranch = normalizeBranch(rowValues.branch) || rowValues.branch;
+      } else if (isNonEmptyValue(rowValues.course)) {
+        resolvedBranch = extractBranchFromCourse(rowValues.course);
+      } else if (isNonEmptyValue(rowValues.branchCode)) {
+        const fromCode = normalizeBranch(rowValues.branchCode);
+        if (fromCode && fromCode !== rowValues.branchCode) {
+          resolvedBranch = fromCode;
+        }
+      }
+
       if (existingStudent) {
         // Prepare partial updates: NEVER overwrite existing database values with blank Excel cells
         const updates = {};
@@ -305,12 +316,17 @@ async function importStudentsFromExcel(buffer, options = {}) {
           newTraining.collegeLocation = rowValues.collegeLocation;
           trainingUpdated = true;
         }
-        if (isNonEmptyValue(rowValues.branch)) {
-          const normBranch = normalizeBranch(rowValues.branch) || rowValues.branch;
-          updates.branch = normBranch;
-          newTraining.branch = normBranch;
+        if (resolvedBranch) {
+          updates.branch = resolvedBranch;
+          newTraining.branch = resolvedBranch;
+          trainingUpdated = true;
+        } else if (!existingStudent.branch && existingTraining.branch) {
+          updates.branch = existingTraining.branch;
+        } else if (existingStudent.branch && !existingTraining.branch) {
+          newTraining.branch = existingStudent.branch;
           trainingUpdated = true;
         }
+
         if (isNonEmptyValue(rowValues.course)) {
           updates.course = rowValues.course;
           newTraining.courseName = rowValues.course;
@@ -373,12 +389,12 @@ async function importStudentsFromExcel(buffer, options = {}) {
           : (options.defaultStatus || "Approved");
 
         const studentName = isNonEmptyValue(rowValues.name) ? rowValues.name : "Student";
-        const course = isNonEmptyValue(rowValues.course) ? rowValues.course : "";
-        const branch = isNonEmptyValue(rowValues.branch) ? (normalizeBranch(rowValues.branch) || rowValues.branch) : "";
-        const year = isNonEmptyValue(rowValues.year) ? rowValues.year : "";
+        const course = isNonEmptyValue(rowValues.course) ? rowValues.course : "B.Tech";
+        const branch = resolvedBranch || "Computer Science and Engineering";
+        const year = isNonEmptyValue(rowValues.year) ? rowValues.year : "3rd Year";
         const collegeName = isNonEmptyValue(rowValues.collegeName) ? rowValues.collegeName : "";
         const collegeLocation = isNonEmptyValue(rowValues.collegeLocation) ? rowValues.collegeLocation : "";
-        const duration = isNonEmptyValue(rowValues.duration) ? rowValues.duration : "";
+        const duration = isNonEmptyValue(rowValues.duration) ? rowValues.duration : "4 Weeks";
 
         const newStudentData = {
           referenceId: newRefId,
@@ -428,5 +444,5 @@ async function importStudentsFromExcel(buffer, options = {}) {
 
 module.exports = {
   importStudentsFromExcel,
+  normalizeBranch,
 };
-
