@@ -1,5 +1,10 @@
 function uniqueOptions(students, key) {
-  return [...new Set(students.map((student) => student[key]).filter(Boolean))]
+  return [...new Set(students.map((student) => {
+    if (key === "branch") return student.trainingManagement?.branch || student.branch || student.discipline || student.department;
+    if (key === "collegeName") return student.trainingManagement?.collegeName || student.collegeName;
+    if (key === "year") return student.trainingManagement?.courseYear || student.year;
+    return student[key];
+  }).filter(Boolean))]
     .sort((a, b) => String(a).localeCompare(String(b)));
 }
 

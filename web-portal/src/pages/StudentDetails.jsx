@@ -16,7 +16,7 @@ import {
   uploadOfferLetterPdf,
 } from "../services/offerLetterService";
 import { getUploadUrl } from "../utils/uploadUrl";
-import { branches as registeredBranchOptions } from "../data/branches";
+import { branches as registeredBranchOptions, normalizeBranch } from "../data/branches";
 import { internshipDurations } from "../data/internshipDurations";
 import { sortDurations } from "../utils/durationSort";
 import { indianStatesAndUnionTerritories } from "../data/states";
@@ -127,8 +127,13 @@ function addDurationToDate(fromDate, duration) {
 
 function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = false, saveRef = null }) {
   const existing = student.trainingManagement || {};
+  const rawBranch = existing.branch || student.branch || student.discipline || student.department || "";
+  const initialBranch = normalizeBranch(rawBranch) || rawBranch;
   const branchOptions = [...new Set([
     ...registeredBranchOptions,
+    initialBranch,
+    normalizeBranch(existing.branch),
+    normalizeBranch(student.branch),
     existing.branch,
     student.branch,
   ].filter(Boolean))];
@@ -136,9 +141,9 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
     studentName: existing.studentName || student.name || "",
     courseName: normalizeCourse(existing.courseName || student.course),
     courseYear: existing.courseYear || student.year || "",
-    branch: existing.branch || student.branch || "",
+    branch: initialBranch,
     collegeName: existing.collegeName || student.collegeName || "",
-    collegeLocation: existing.collegeLocation || student.location || "",
+    collegeLocation: existing.collegeLocation || student.location || student.collegeLocation || student.collegeAddress || "",
     trainingDuration: existing.trainingDuration || student.internshipDuration || "",
     fromDate: existing.fromDate || "",
     toDate: existing.toDate || "",
@@ -152,6 +157,32 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
     resignationStatus: student.resignationStatus || "No",
     resignationDate: student.resignationDate ? String(student.resignationDate).slice(0, 10) : "",
   });
+
+  useEffect(() => {
+    const fresh = student.trainingManagement || {};
+    const freshRawBranch = fresh.branch || student.branch || student.discipline || student.department || "";
+    const freshBranch = normalizeBranch(freshRawBranch) || freshRawBranch;
+    setForm({
+      studentName: fresh.studentName || student.name || "",
+      courseName: normalizeCourse(fresh.courseName || student.course),
+      courseYear: fresh.courseYear || student.year || "",
+      branch: freshBranch,
+      collegeName: fresh.collegeName || student.collegeName || "",
+      collegeLocation: fresh.collegeLocation || student.location || student.collegeLocation || student.collegeAddress || "",
+      trainingDuration: fresh.trainingDuration || student.internshipDuration || "",
+      fromDate: fresh.fromDate || "",
+      toDate: fresh.toDate || "",
+      joined: fresh.joined || student.joinedStatus || "",
+      division: fresh.division || "",
+      projectTitle: fresh.projectTitle || "",
+      projectGuide: fresh.projectGuide || "",
+      designation: fresh.designation || "",
+      leaveAvailed: fresh.leaveAvailed || "",
+      completed: fresh.completed || student.completedStatus || "",
+      resignationStatus: student.resignationStatus || "No",
+      resignationDate: student.resignationDate ? String(student.resignationDate).slice(0, 10) : "",
+    });
+  }, [student]);
   const [open, setOpen] = useState(alwaysOpen);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -702,9 +733,9 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
       collegeLocation: student.location || "",
       collegeState: student.collegeState || "",
       
-      course: student.course || "",
-      branch: student.branch || "",
-      year: student.year || "",
+      course: normalizeCourse(student.course || student.trainingManagement?.courseName),
+      branch: normalizeBranch(student.branch || student.trainingManagement?.branch || student.discipline || student.department) || "",
+      year: student.year || student.trainingManagement?.courseYear || "",
       cgpa: student.cgpa || "",
       collegeId: student.collegeId || "",
       
@@ -1092,7 +1123,7 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
                 onChange={(e) => handleEditChange("branch", e.target.value)}
               >
                 <option value="">Select Branch</option>
-                {registeredBranchOptions.map((b) => (
+                {[...new Set([...registeredBranchOptions, editForm.branch].filter(Boolean))].map((b) => (
                   <option key={b} value={b}>
                     {b}
                   </option>
@@ -1137,11 +1168,11 @@ function StudentDetails({ id, onClose, onDirtyChange, saveTrigger, onSaveSuccess
         <DetailGrid
           title="Academic Details"
           rows={[
-            ["Course", student.course],
-            ["Branch", student.branch],
-            ["Year", student.year],
-            ["CGPA", student.cgpa],
-            ["College ID", student.collegeId],
+            ["Course", student.course || student.trainingManagement?.courseName || "-"],
+            ["Branch", student.branch || student.trainingManagement?.branch || student.discipline || student.department || "-"],
+            ["Year", student.year || student.trainingManagement?.courseYear || "-"],
+            ["CGPA", student.cgpa || "-"],
+            ["College ID", student.collegeId || "-"],
           ]}
         />
       ))}

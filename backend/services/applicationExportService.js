@@ -28,17 +28,23 @@ async function generateApplicationsWorkbook() {
   });
 
   worksheet.columns = [
-    { header: "Application ID", key: "referenceId", width: 22 },
-    { header: "Student Name", key: "name", width: 26 },
-    { header: "Email", key: "email", width: 30 },
-    { header: "Phone", key: "phone", width: 16 },
-    { header: "College", key: "college", width: 35 },
+    { header: "S.no.", key: "sno", width: 10 },
+    { header: "Name", key: "name", width: 26 },
+    { header: "Reference ID", key: "referenceId", width: 22 },
+    { header: "Course", key: "course", width: 20 },
     { header: "Branch", key: "branch", width: 24 },
+    { header: "Year", key: "year", width: 14 },
+    { header: "College name", key: "collegeName", width: 35 },
+    { header: "College location", key: "collegeLocation", width: 30 },
+    { header: "Email", key: "email", width: 30 },
+    { header: "Phone", key: "phone", width: 18 },
+    { header: "Gender", key: "gender", width: 14 },
+    { header: "DOB", key: "dob", width: 16 },
+    { header: "CGPA", key: "cgpa", width: 12 },
+    { header: "Duration", key: "duration", width: 18 },
     { header: "Division Allotted", key: "division", width: 24 },
     { header: "Seat Number", key: "seatNumber", width: 16 },
     { header: "Status", key: "status", width: 15 },
-    { header: "Submitted Date", key: "submittedDate", width: 18 },
-    { header: "Approval Date", key: "approvalDate", width: 18 },
   ];
 
   const headerRow = worksheet.getRow(1);
@@ -53,27 +59,43 @@ async function generateApplicationsWorkbook() {
 
   const students = await Student.find({}).sort({ submittedAt: -1, createdAt: -1 });
 
+  let index = 1;
   for (const student of students) {
+    const training = student.trainingManagement || {};
+    const branch = training.branch || student.branch || "";
+    const collegeName = training.collegeName || student.collegeName || "";
+    const collegeLocation = training.collegeLocation || student.collegeLocation || student.location || student.collegeAddress || "";
+    const course = training.courseName || student.course || "";
+    const year = training.courseYear || student.year || "";
+    const studentName = training.studentName || student.name || "";
+    const duration = training.trainingDuration || student.internshipDuration || student.duration || "";
+
     const row = worksheet.addRow({
-      referenceId: student.referenceId || String(student._id || "-"),
-      name: student.name || "-",
-      email: student.email || "-",
-      phone: student.phone || "-",
-      college: student.collegeName || "-",
-      branch: student.branch || "-",
+      sno: index++,
+      name: studentName,
+      referenceId: student.referenceId || String(student._id || ""),
+      course,
+      branch,
+      year,
+      collegeName,
+      collegeLocation,
+      email: student.email || "",
+      phone: student.phone || "",
+      gender: student.gender || "",
+      dob: student.dob ? formatExportDate(student.dob) : "",
+      cgpa: student.cgpa || "",
+      duration,
       division:
-        student.trainingManagement?.division ||
+        training.division ||
         student.recommendedBy ||
         student.division ||
-        "-",
+        "",
       seatNumber:
         student.serialNumber ||
-        student.trainingManagement?.seatNumber ||
+        training.seatNumber ||
         student.seatNumber ||
-        "-",
+        "",
       status: student.status || "Pending",
-      submittedDate: formatExportDate(student.submittedAt || student.createdAt),
-      approvalDate: formatExportDate(student.approvedDate),
     });
     row.alignment = { vertical: "middle" };
   }

@@ -1,6 +1,7 @@
 import { memo, useState } from "react";
 import StatusBadge from "./StatusBadge";
 import { updateStudentReview } from "../../services/adminService";
+import { normalizeBranch } from "../../data/branches";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -103,11 +104,11 @@ const StudentRow = memo(function StudentRow({
       <td>{serialNumber}</td>
       <td>{student.referenceId || "-"}</td>
       <td>{student.name}</td>
-      <td>{student.collegeName}</td>
-      <td>{student.branch}</td>
-      <td>{student.trainingManagement?.division || "-"}</td>
-      <td>{student.year}</td>
-      <td>{student.cgpa}</td>
+      <td>{student.collegeName || student.trainingManagement?.collegeName || "-"}</td>
+      <td>{normalizeBranch(student.trainingManagement?.branch || student.branch || student.discipline || student.department) || student.trainingManagement?.branch || student.branch || "-"}</td>
+      <td>{student.trainingManagement?.division || student.recommendedBy || student.division || "-"}</td>
+      <td>{student.year || student.trainingManagement?.courseYear || "-"}</td>
+      <td>{student.cgpa || "-"}</td>
       <td>{formatDate(student.submittedAt)}</td>
       <td>
         <StatusDropdown

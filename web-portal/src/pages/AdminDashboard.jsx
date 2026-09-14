@@ -1978,19 +1978,9 @@ function AdminDashboard() {
         </div>
         <div className="admin-topbar__actions">
           {currentView === "approved-students" && (
-            <>
-              <button
-                className="admin-secondary-btn"
-                type="button"
-                disabled={isImporting}
-                onClick={handleImportClick}
-              >
-                {isImporting ? "Importing..." : "Import Students"}
-              </button>
-              <button className="admin-secondary-btn" type="button" onClick={openAdministration}>
-                System Configurations
-              </button>
-            </>
+            <button className="admin-secondary-btn" type="button" onClick={openAdministration}>
+              System Configurations
+            </button>
           )}
           {currentView !== "home" && (
             <button className="admin-secondary-btn" type="button" onClick={handleGoHomeWithCheck}>
@@ -2618,11 +2608,11 @@ function AdminDashboard() {
                     <td hidden={!managementFields.includes("serial")}>{sortedStudents.indexOf(student) + 1}</td>
                     <td hidden={!managementFields.includes("name")} style={{ whiteSpace: "normal", wordBreak: "break-word" }}>{student.name}</td>
                     <td hidden={!managementFields.includes("referenceId")}>{student.referenceId || "-"}</td>
-                    <td hidden={!managementFields.includes("course")} style={{ whiteSpace: "normal", wordBreak: "break-word" }}>{student.course}</td>
-                    <td hidden={!managementFields.includes("branch")} style={{ whiteSpace: "normal", wordBreak: "break-word" }}>{student.branch}</td>
-                    <td hidden={!managementFields.includes("year")} style={{ whiteSpace: "normal", wordBreak: "break-word" }}>{student.year}</td>
-                    <td hidden={!managementFields.includes("collegeName")} style={{ whiteSpace: "normal", wordBreak: "break-word" }}>{student.collegeName || "-"}</td>
-                    <td hidden={!managementFields.includes("location")}>{student.location || "-"}</td>
+                    <td hidden={!managementFields.includes("course")} style={{ whiteSpace: "normal", wordBreak: "break-word" }}>{student.course || student.trainingManagement?.courseName || "-"}</td>
+                    <td hidden={!managementFields.includes("branch")} style={{ whiteSpace: "normal", wordBreak: "break-word" }}>{student.branch || student.trainingManagement?.branch || student.discipline || student.department || "-"}</td>
+                    <td hidden={!managementFields.includes("year")} style={{ whiteSpace: "normal", wordBreak: "break-word" }}>{student.year || student.trainingManagement?.courseYear || "-"}</td>
+                    <td hidden={!managementFields.includes("collegeName")} style={{ whiteSpace: "normal", wordBreak: "break-word" }}>{student.collegeName || student.trainingManagement?.collegeName || "-"}</td>
+                    <td hidden={!managementFields.includes("location")}>{student.location || student.collegeLocation || student.trainingManagement?.collegeLocation || "-"}</td>
                     <td hidden={!managementFields.includes("email")}>{student.email || "-"}</td>
                     <td hidden={!managementFields.includes("phone")}>{student.phone || "-"}</td>
                     <td hidden={!managementFields.includes("status")} style={{ whiteSpace: "normal", wordBreak: "break-word", verticalAlign: "middle" }}

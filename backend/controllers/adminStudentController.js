@@ -100,9 +100,32 @@ function buildStudentFilter(query) {
     });
   }
 
-  if (query.collegeName) filter.collegeName = query.collegeName;
-  if (query.branch) filter.branch = query.branch;
-  if (query.year) filter.year = query.year;
+  if (query.collegeName) {
+    conditions.push({
+      $or: [
+        { collegeName: query.collegeName },
+        { "trainingManagement.collegeName": query.collegeName },
+      ],
+    });
+  }
+  if (query.branch) {
+    conditions.push({
+      $or: [
+        { branch: query.branch },
+        { "trainingManagement.branch": query.branch },
+        { discipline: query.branch },
+        { department: query.branch },
+      ],
+    });
+  }
+  if (query.year) {
+    conditions.push({
+      $or: [
+        { year: query.year },
+        { "trainingManagement.courseYear": query.year },
+      ],
+    });
+  }
 
   if (query.resignation === "Yes") {
     filter.resignationStatus = "Yes";
