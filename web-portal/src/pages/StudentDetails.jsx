@@ -16,7 +16,6 @@ import {
   uploadOfferLetterPdf,
 } from "../services/offerLetterService";
 import { getUploadUrl } from "../utils/uploadUrl";
-import { openAdminDocument } from "../utils/openAdminDocument";
 import { branches as registeredBranchOptions } from "../data/branches";
 import { internshipDurations } from "../data/internshipDurations";
 import { sortDurations } from "../utils/durationSort";
@@ -94,13 +93,9 @@ function DocumentButton({ label, file }) {
   if (!file?.url) return null;
 
   return (
-    <button
-      className="admin-secondary-btn admin-link-button"
-      type="button"
-      onClick={() => openAdminDocument(file.url).catch((error) => window.alert(error.message))}
-    >
+    <a className="admin-secondary-btn admin-link-button" href={getUploadUrl(file.url)} target="_blank" rel="noreferrer">
       View {label}
-    </button>
+    </a>
   );
 }
 
@@ -467,11 +462,6 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
         value={form.collegeLocation}
         onChange={handleChange}
       />
-    </label>
-
-    <label className="admin-field">
-      <span>CGPA</span>
-      <input value={student.cgpa ?? ""} readOnly aria-label="CGPA" />
     </label>
 
     <label className="admin-field">

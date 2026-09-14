@@ -239,6 +239,8 @@ async function saveProformaConfig(req, res, next) {
   }
 }
 
+const pool = require("../db");
+
 async function updateCertificateNumber(req, res, next) {
   try {
     const nextCertificateNumber = Number(req.body.nextCertificateNumber);
@@ -248,6 +250,16 @@ async function updateCertificateNumber(req, res, next) {
     const administration = await getAdministration();
     administration.nextCertificateNumber = nextCertificateNumber;
     await saveAdministration(administration);
+
+    try {
+      await pool.query(`
+        UPDATE students 
+        SET student_data = student_data - 'certificateNumber' || jsonb_build_object('certificateNumber', null)
+        WHERE student_data->>'certificateNumber' IS NOT NULL
+      `);
+    } catch (dbErr) {
+      console.warn("Could not reset student certificate numbers on admin config update:", dbErr.message);
+    }
 
     await logActivity({
       req,

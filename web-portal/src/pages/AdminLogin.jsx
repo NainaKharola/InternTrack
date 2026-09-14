@@ -24,6 +24,7 @@ function AdminLogin() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError("");
 

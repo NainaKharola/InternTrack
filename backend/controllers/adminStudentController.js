@@ -223,7 +223,7 @@ async function getStudents(req, res) {
     const filter = buildStudentFilter(req.query);
     const sort = buildSort(req.query.sortBy, req.query.sortOrder);
     const projection =
-      "_id referenceId name gender dob course collegeName location email phone branch year cgpa submittedAt status recommendedBy trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType completedStatus bankDetails paidInternshipProjectDetails firstQuarterReport secondQuarterReport resignationStatus resignationDate";
+      "_id referenceId name gender dob course collegeName location email phone branch year cgpa submittedAt status recommendedBy trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType completedStatus bankDetails paidInternshipProjectDetails firstQuarterReport secondQuarterReport";
 
     const [
       students,
@@ -288,10 +288,7 @@ async function getCertificateStudents(req, res) {
         approvedDate: range,
       });
     }
-    const students = await Student.find(
-      filter,
-      "name referenceId collegeName course branch year location internshipDuration trainingManagement",
-    )
+    const students = await Student.find(filter)
       .sort({ "trainingManagement.toDate": -1, name: 1 })
       .lean();
 
@@ -351,11 +348,14 @@ async function downloadCertificates(req, res) {
     const signatureDesignation = req.body.signatureDesignation || "TECHNICAL OFFICER 'C'";
 
     const student = students[0];
-    const { reserveNextCertificateNumber } = require("../services/administrationService");
+    const { reserveNextCertificateNumber, getAdministration } = require("../services/administrationService");
     let certNo = student.certificateNumber;
     if (deleteAfterDownload) {
       certNo = await reserveNextCertificateNumber(student._id);
       student.certificateNumber = certNo;
+    } else if (!certNo) {
+      const adminConfig = await getAdministration();
+      certNo = adminConfig.nextCertificateNumber || 100;
     }
 
     const [pdf] = await generatePdfsFromHtml([
@@ -364,6 +364,7 @@ async function downloadCertificates(req, res) {
     if (deleteAfterDownload) {
       await Student.findByIdAndUpdate(student._id, {
         certificateGenerated: true,
+        certificateNumber: certNo,
       });
     }
 
@@ -1195,7 +1196,43 @@ module.exports = {
   recommendedByOptions,
   generateReportPdf,
   exportApplications,
+  importStudents,
 };
+
+async function importStudents(req, res) {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select an Excel (.xlsx, .xls) file to import.",
+      });
+    }
+
+    const { importStudentsFromExcel } = require("../services/studentImportService");
+    const { summary, errors } = await importStudentsFromExcel(req.file.buffer);
+
+    await logActivity({
+      req,
+      module: "Student Module",
+      action: "Imported Students",
+      description: `Imported students from Excel: ${summary.created} created, ${summary.updated} updated, ${summary.failed} failed out of ${summary.total} total rows.`,
+      status: summary.failed > 0 && summary.created === 0 && summary.updated === 0 ? "Failed" : "Success",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Import completed: ${summary.created} created, ${summary.updated} updated, ${summary.failed} failed.`,
+      summary,
+      errors,
+    });
+  } catch (error) {
+    console.error("Student import error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to process student import file.",
+    });
+  }
+}
 
 async function exportApplications(req, res) {
   try {
@@ -1250,4 +1287,5 @@ async function generateReportPdf(req, res) {
     return res.status(500).json({ success: false, message: "Unable to generate PDF.", error: error.message });
   }
 }
+
 

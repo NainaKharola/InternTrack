@@ -15,11 +15,12 @@ const {
 } = require("../middleware/uploadMiddleware");
 const { protectAdmin } = require("../middleware/adminAuth");
 const { protectStudent } = require("../middleware/studentAuth");
+const { authLimiter } = require("../middleware/rateLimiter");
 
 const router = express.Router();
 
 router.post("/", uploadStudentDocuments, createStudent);
-router.post("/login", loginStudent);
+router.post("/login", authLimiter, loginStudent);
 router.post("/logout", logoutStudent);
 router.get("/dashboard", protectStudent, getStudentDashboard);
 router.patch("/paid-project-details", protectStudent, savePaidInternshipProjectDetails);

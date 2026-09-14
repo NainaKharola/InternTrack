@@ -1,15 +1,13 @@
-import { getAdminToken } from "../services/adminService";
 import { getUploadUrl } from "./uploadUrl";
 
 export async function openAdminDocument(fileUrl) {
   // Open synchronously from the click event so browsers do not block the preview.
   const previewWindow = window.open("", "_blank");
   if (previewWindow) previewWindow.opener = null;
-  const token = getAdminToken();
 
   try {
     const response = await fetch(getUploadUrl(fileUrl), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: "same-origin",
     });
 
     if (!response.ok) {

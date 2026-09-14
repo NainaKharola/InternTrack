@@ -17,7 +17,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 
 async function getAdministration() {
   try {
-    const res = await pool.query("SELECT data FROM administration LIMIT 1");
+    const res = await pool.query("SELECT data FROM administration ORDER BY id ASC LIMIT 1");
     let value;
     if (res.rows.length > 0) {
       value = res.rows[0].data;
@@ -70,10 +70,13 @@ async function getAdministration() {
 }
 
 async function saveAdministration(configuration) {
-  configuration.divisions = [...configuration.divisions].sort((left, right) => left.localeCompare(right));
-  const res = await pool.query("SELECT id FROM administration LIMIT 1");
+  if (Array.isArray(configuration.divisions)) {
+    configuration.divisions = [...configuration.divisions].sort((left, right) => left.localeCompare(right));
+  }
+  const res = await pool.query("SELECT id FROM administration ORDER BY id ASC LIMIT 1");
   if (res.rows.length > 0) {
     await pool.query("UPDATE administration SET data = $1, updated_at = NOW() WHERE id = $2", [configuration, res.rows[0].id]);
+    await pool.query("DELETE FROM administration WHERE id != $1", [res.rows[0].id]);
   } else {
     await pool.query("INSERT INTO administration (data) VALUES ($1)", [configuration]);
   }
@@ -84,23 +87,38 @@ async function reserveNextCertificateNumber(studentId) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const studentRes = await client.query("SELECT student_data FROM students WHERE student_data->>'_id' = $1", [studentId]);
+    const studentRes = await client.query(
+      "SELECT id, student_data FROM students WHERE student_data->>'_id' = $1 OR id::text = $1 FOR UPDATE",
+      [String(studentId)]
+    );
     if (studentRes.rows.length === 0) throw new Error("Student not found");
     
-    const studentData = studentRes.rows[0].student_data;
-    if (studentData.certificateNumber !== null && studentData.certificateNumber !== undefined) {
-      await client.query("COMMIT");
-      return studentData.certificateNumber;
+    const studentRow = studentRes.rows[0];
+    const studentData = studentRow.student_data || {};
+    
+    const adminRes = await client.query("SELECT id, data FROM administration ORDER BY id ASC LIMIT 1 FOR UPDATE");
+    let adminId;
+    let adminData;
+    
+    if (adminRes.rows.length === 0) {
+      const config = clone(defaultConfiguration);
+      const insertRes = await client.query("INSERT INTO administration (data) VALUES ($1) RETURNING id, data", [config]);
+      adminId = insertRes.rows[0].id;
+      adminData = insertRes.rows[0].data;
+    } else {
+      adminId = adminRes.rows[0].id;
+      adminData = adminRes.rows[0].data;
     }
-    
-    const adminRes = await client.query("SELECT id, data FROM administration LIMIT 1 FOR UPDATE");
-    if (adminRes.rows.length === 0) throw new Error("Administration settings not initialized");
-    
-    const adminId = adminRes.rows[0].id;
-    const adminData = adminRes.rows[0].data;
     
     let nextNum = Number(adminData.nextCertificateNumber);
     if (!Number.isInteger(nextNum) || nextNum <= 0) nextNum = 100;
+    
+    const existingCertNo = Number(studentData.certificateNumber);
+    // If student already has a certificate number that is valid and assigned in the current sequence
+    if (Number.isInteger(existingCertNo) && existingCertNo > 0 && existingCertNo >= nextNum - 1 && existingCertNo < nextNum) {
+      await client.query("COMMIT");
+      return existingCertNo;
+    }
     
     const assignedNum = nextNum;
     adminData.nextCertificateNumber = nextNum + 1;
@@ -108,7 +126,8 @@ async function reserveNextCertificateNumber(studentId) {
     await client.query("UPDATE administration SET data = $1, updated_at = NOW() WHERE id = $2", [adminData, adminId]);
     
     studentData.certificateNumber = assignedNum;
-    await client.query("UPDATE students SET student_data = $1, updated_at = NOW() WHERE student_data->>'_id' = $2", [studentData, studentId]);
+    studentData.certificateGenerated = true;
+    await client.query("UPDATE students SET student_data = $1, updated_at = NOW() WHERE id = $2", [studentData, studentRow.id]);
     
     await client.query("COMMIT");
     return assignedNum;
@@ -121,3 +140,4 @@ async function reserveNextCertificateNumber(studentId) {
 }
 
 module.exports = { getAdministration, saveAdministration, reserveNextCertificateNumber };
+

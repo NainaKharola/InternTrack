@@ -1,6 +1,5 @@
 const Student = require("../models/Student");
 const path = require("path");
-const fs = require("fs").promises;
 const jwt = require("jsonwebtoken");
 const { getCookieOptions } = require("../utils/cookieOptions");
 const { generatePdfFromHtml } = require("../services/pdfService");
@@ -190,29 +189,27 @@ function escapeHtml(value) {
 
 function formatDate(value) {
   if (!value) return "";
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString("en-IN");
+  return new Date(value).toLocaleDateString("en-IN");
 }
 
 function buildStudentTemplateData(student) {
   return {
-    studentName: student.name || "",
-    fatherName: student.fatherName || "",
-    parentOccupation: student.fatherOccupation || "",
-    temporaryAddress: student.currentAddress || "",
-    permanentAddress: student.permanentAddress || "",
-    collegeName: student.collegeName || "",
-    collegeLocation: student.location || student.collegeLocation || "",
-    course: student.course || "",
-    year: student.year || "",
-    branch: student.branch || "",
-    mobileNumber: student.phone || "",
-    residencePhone: student.fatherPhone || "",
-    email: student.email || "",
+    studentName: student.name,
+    fatherName: student.fatherName,
+    parentOccupation: student.fatherOccupation,
+    temporaryAddress: student.currentAddress,
+    permanentAddress: student.permanentAddress,
+    collegeName: student.collegeName,
+    collegeLocation: student.location,
+    course: student.course,
+    year: student.year,
+    branch: student.branch,
+    mobileNumber: student.phone,
+    residencePhone: student.fatherPhone,
+    email: student.email,
     dateOfBirth: formatDate(student.dob),
     nationality: "Indian",
-    collegeIdNumber: student.collegeId || "",
+    collegeIdNumber: student.collegeId,
     issueDate: "",
     place: "",
     sponsoringAuthorityName: "",
@@ -619,16 +616,13 @@ async function downloadStudentDocument(req, res) {
         : "DRDO-Character-Certificate.pdf";
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Length", pdf.length);
-    return res.end(pdf);
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    return res.send(pdf);
   } 
   catch (error) {
-    console.error("Error generating student document PDF:", error);
     return res.status(500).json({
       success: false,
-      message: "Unable to download document. Please try again later.",
-      error: error.message,
+      message: error.message,
     });
   }
 }

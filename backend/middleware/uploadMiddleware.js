@@ -279,4 +279,18 @@ function uploadCompletedDocuments(req, res, next) {
   });
 }
 
-module.exports = { uploadCompletedDocuments, uploadStudentDocuments };
+const excelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const allowedExts = [".xlsx", ".xls", ".csv"];
+    if (allowedExts.includes(ext) || file.mimetype.includes("sheet") || file.mimetype.includes("excel") || file.mimetype.includes("csv")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only Excel (.xlsx, .xls) and CSV files are allowed."));
+    }
+  },
+});
+
+module.exports = { uploadCompletedDocuments, uploadStudentDocuments, excelUpload };

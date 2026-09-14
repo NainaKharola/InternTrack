@@ -6,7 +6,7 @@ import SortControls from "../components/Admin/SortControls";
 import StudentTable from "../components/Admin/StudentTable";
 import {
   clearAdminToken,
-  getAdminToken,
+  logoutAdmin,
   deleteAdminStudents,
   downloadCertificates,
   fetchAdminStudents,
@@ -17,10 +17,11 @@ import {
   saveProformaConfig,
   createPdfUrl,
   exportApplicationsExcel,
+  importAdminStudents,
 } from "../services/adminService";
 import { createGyapanPreview, generateGyapanPdf } from "../services/gyapanService";
 import { downloadOfferLetterPdf } from "../services/offerLetterService";
-import { downloadDocument, printPdf, readDocumentResponse } from "../services/documentFileService";
+import { printPdf } from "../services/documentFileService";
 import { getUploadUrl } from "../utils/uploadUrl";
 import { useAdminAuth } from "../auth/useAdminAuth";
 import StudentForm from "../components/Form/StudentForm";
@@ -205,15 +206,10 @@ function AdminDashboard() {
 
   useEffect(() => {
     if (quarterlySubView === "proforma") {
-      const isResigned = (s) => {
-        const val = s.resignationStatus ?? s.trainingManagement?.resignationStatus;
-        if (typeof val === "boolean") return val;
-        if (typeof val === "number") return val === 1;
-        const str = String(val || "").trim().toLowerCase();
-        return str === "yes" || str === "true" || str === "1";
-      };
-
-      const filtered = allStudents.filter((s) => {
+      const approvedPaid = allStudents.filter(
+        (s) => s.status === "Approved" && s.internshipType === "Paid"
+      );
+      const filtered = approvedPaid.filter((s) => {
         const joining = s.trainingManagement?.fromDate || "";
         if (proformaFromDate && proformaToDate) {
           const isInSelectedRange = joining >= proformaFromDate && joining <= proformaToDate;
@@ -224,16 +220,10 @@ function AdminDashboard() {
       const mapped = filtered.map((student) => {
         const project = student.paidInternshipProjectDetails || {};
         const training = student.trainingManagement || {};
-        const discipline = student.course && student.branch
-          ? `${student.course} - ${student.branch}`
-          : (student.course || student.branch || "");
+        const discipline = `${student.course || ""} - ${student.branch || ""}`;
         const joiningDate = training.fromDate ? formatReportDate(training.fromDate) : "";
         const completionDate = training.toDate ? formatReportDate(training.toDate) : "";
-        const hasResigned = isResigned(student);
-        const resignationDate = hasResigned && (student.resignationDate || training.resignationDate)
-          ? formatReportDate(student.resignationDate || training.resignationDate)
-          : "";
-        const remarks = training.remarks || student.remarks || "";
+        const resignationDate = student.resignationStatus === "Yes" && student.resignationDate ? formatReportDate(student.resignationDate) : "";
 
         return {
           _id: student._id,
@@ -249,7 +239,7 @@ function AdminDashboard() {
           achievements: project.achievements || "",
           completionDate: completionDate || "",
           resignationDate: resignationDate || "",
-          remarks: remarks || ""
+          remarks: ""
         };
       });
       setProformaStudents(mapped);
@@ -296,6 +286,10 @@ function AdminDashboard() {
   const [statusConfirm, setStatusConfirm] = useState(null); // { studentId, oldStatus, newStatus }
   const [statusUpdating, setStatusUpdating] = useState(null); // studentId being updated
 
+  const importFileInputRef = useRef(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importSummaryModal, setImportSummaryModal] = useState(null);
+
   const query = useMemo(
     () => ({
       search,
@@ -305,6 +299,52 @@ function AdminDashboard() {
     }),
     [filters, search, sort]
   );
+
+  const handleImportClick = () => {
+    console.log("IMPORT STUDENTS BUTTON CLICKED");
+    if (!importFileInputRef.current) {
+      console.error("File input ref is missing");
+      return;
+    }
+    importFileInputRef.current.click();
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    console.log("SELECTED FILE:", file);
+
+    if (!file) {
+      console.log("No file selected");
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const result = await importAdminStudents(file);
+      console.log("IMPORT RESULT:", result);
+      setImportSummaryModal({
+        success: true,
+        summary: result.summary || {},
+        errors: result.errors || [],
+      });
+      await loadAll();
+      const response = await fetchAdminStudents(query);
+      setStudents(response.students);
+      setSummary(response.summary);
+    } catch (err) {
+      console.error("Student import failed:", err);
+      setImportSummaryModal({
+        success: false,
+        message: err.message || "Failed to import student records from file.",
+        errors: [],
+      });
+    } finally {
+      setIsImporting(false);
+      if (event.target) event.target.value = "";
+    }
+  };
+
+
 
   // Original load effects
   useEffect(() => {
@@ -702,7 +742,7 @@ function AdminDashboard() {
   };
 
   const handleLogout = useCallback(() => {
-    clearAdminToken();
+    logoutAdmin();
     window.history.pushState({}, "", "/admin/login");
     window.dispatchEvent(new PopStateEvent("popstate"));
   }, []);
@@ -893,16 +933,17 @@ function AdminDashboard() {
     setDocumentBusy(true); setDocumentError("");
     try {
       const result = await generateGyapanPdf(item.gyapan._id);
-      const token = getAdminToken();
-      const response = await fetch(getUploadUrl(result.pdfUrl), {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const blob = await readDocumentResponse(response);
+      const response = await fetch(getUploadUrl(result.pdfUrl));
+      const blob = await response.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
       const firstStudentId = item.gyapan.selectedStudents?.[0];
       const student = allStudents.find((s) => s._id === firstStudentId) || {};
       const refId = student.referenceId || "UNKNOWN";
       const nameNoSpaces = (student.name || "Student").replace(/\s+/g, "");
-      downloadDocument(blob, `ISM_${refId}_${nameNoSpaces}.pdf`);
+      link.download = `ISM_${refId}_${nameNoSpaces}.pdf`;
+      link.click();
+      URL.revokeObjectURL(link.href);
 
       const studentIds = item.gyapan.selectedStudents || [];
       if (studentIds.length) {
@@ -1915,6 +1956,14 @@ function AdminDashboard() {
 
   return (
     <main className="admin-console admin-shell">
+      {/* Hidden File Input for Excel Import */}
+      <input
+        ref={importFileInputRef}
+        type="file"
+        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
       {/* Dynamic Header */}
       <header className="admin-topbar">
         <div>
@@ -1930,22 +1979,16 @@ function AdminDashboard() {
         <div className="admin-topbar__actions">
           {currentView === "approved-students" && (
             <>
-              <button className="admin-secondary-btn" type="button" onClick={openAdministration}>
-                System Configurations
-              </button>
               <button
                 className="admin-secondary-btn"
                 type="button"
-                onClick={() => {
-                  setExcelImportMode("students");
-                  setExcelImportOpen(true);
-                  setExcelFile(null);
-                  setExcelImportMessage("");
-                  setExcelImportErrors([]);
-                  setExcelImportSummary(null);
-                }}
+                disabled={isImporting}
+                onClick={handleImportClick}
               >
-                Import Students
+                {isImporting ? "Importing..." : "Import Students"}
+              </button>
+              <button className="admin-secondary-btn" type="button" onClick={openAdministration}>
+                System Configurations
               </button>
             </>
           )}
@@ -2449,6 +2492,15 @@ function AdminDashboard() {
                 {isExportingApplications ? "Exporting..." : "📊 Export to Excel"}
               </button>
               <button
+                className="admin-secondary-btn"
+                type="button"
+                disabled={isImporting}
+                onClick={handleImportClick}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 16px" }}
+              >
+                {isImporting ? "Importing..." : "📥 Import Students"}
+              </button>
+              <button
                 className="admin-primary-btn"
                 type="button"
                 onClick={() => {
@@ -2729,6 +2781,15 @@ function AdminDashboard() {
                   </button>
                   <button className="admin-secondary-btn" type="button" onClick={() => { setOfferLetterMode(true); setOfferLetterIds([]); }}>
                     Generate Offer Letter
+                  </button>
+                  <button
+                    className="admin-secondary-btn"
+                    type="button"
+                    disabled={isImporting}
+                    onClick={handleImportClick}
+                    style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+                  >
+                    {isImporting ? "Importing..." : "📥 Import Students"}
                   </button>
                   <button
                     className="admin-danger-btn"
@@ -3096,6 +3157,46 @@ function AdminDashboard() {
               <button className="admin-secondary-btn" type="button" onClick={() => setSignatureEditorOpen(false)}>Cancel</button>
             </div>
           </form>
+        </div>
+      )}
+      {importSummaryModal && (
+        <div className="certificate-modal-backdrop" role="dialog" aria-modal="true" aria-label="Student Import Summary">
+          <div className="certificate-modal" style={{ maxWidth: "550px", width: "90%" }}>
+            <h2>{importSummaryModal.success ? "✅ Student Import Result" : "❌ Import Failed"}</h2>
+            {importSummaryModal.success ? (
+              <>
+                <div style={{ margin: "16px 0", lineHeight: "1.8", fontSize: "0.95rem" }}>
+                  <div><strong>Total Rows Processed:</strong> {importSummaryModal.summary?.total ?? 0}</div>
+                  <div><strong style={{ color: "#16a34a" }}>Created (New Students):</strong> {importSummaryModal.summary?.created ?? 0}</div>
+                  <div><strong style={{ color: "#2563eb" }}>Updated (Existing Students):</strong> {importSummaryModal.summary?.updated ?? 0}</div>
+                  <div><strong style={{ color: "#dc2626" }}>Failed:</strong> {importSummaryModal.summary?.failed ?? 0}</div>
+                </div>
+                {importSummaryModal.errors && importSummaryModal.errors.length > 0 && (
+                  <div style={{ marginTop: "12px", maxHeight: "150px", overflowY: "auto", background: "#fef2f2", border: "1px solid #fecaca", padding: "10px", borderRadius: "6px", fontSize: "0.85rem", color: "#991b1b" }}>
+                    <strong>Row Errors:</strong>
+                    <ul style={{ margin: "6px 0 0 16px", padding: 0 }}>
+                      {importSummaryModal.errors.map((err, idx) => (
+                        <li key={idx}>Row {err.row}: {err.error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="admin-error" style={{ margin: "16px 0", color: "#dc2626" }}>
+                {importSummaryModal.message || "An unexpected error occurred during import."}
+              </p>
+            )}
+            <div className="admin-actions-row" style={{ marginTop: "20px", justifyContent: "flex-end" }}>
+              <button
+                className="admin-primary-btn"
+                type="button"
+                onClick={() => setImportSummaryModal(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>

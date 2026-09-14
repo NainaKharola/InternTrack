@@ -62,27 +62,9 @@ app.use(helmet({
   contentSecurityPolicy: false,
 }));
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: { success: false, message: "Too many attempts. Please try again after 15 minutes." }
-});
-
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500,
-  message: { success: false, message: "Too many requests. Please try again after 15 minutes." }
-});
+const { generalLimiter } = require("./middleware/rateLimiter");
 
 app.use("/api/", generalLimiter);
-app.use("/api/admin/auth", authLimiter);
-app.use("/api/students/login", authLimiter);
-app.use("/api/students", (req, res, next) => {
-  if (req.method === "POST" && req.path === "/") {
-    return authLimiter(req, res, next);
-  }
-  next();
-});
 
 const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")

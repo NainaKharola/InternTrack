@@ -9,15 +9,30 @@ export function getAdminToken() {
 }
 
 export function setAdminToken(token) {
+  if (import.meta.env.DEV) console.log("[adminService] Setting admin token");
   sessionStorage.setItem(TOKEN_KEY, token);
   localStorage.removeItem(TOKEN_KEY);
   window.dispatchEvent(new Event("admin-auth-changed"));
 }
 
-export function clearAdminToken() {
+export function clearAdminToken(notify = true) {
+  const hadToken = Boolean(sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY));
+  if (import.meta.env.DEV) console.log("[adminService] Clearing admin token. hadToken:", hadToken, "notify:", notify);
   sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
-  fetch(`${API_URL}/auth/logout`, { method: "POST" }).catch(() => {});
+  if (notify && hadToken) {
+    window.dispatchEvent(new Event("admin-auth-changed"));
+  }
+}
+
+export async function logoutAdmin() {
+  if (import.meta.env.DEV) console.log("[adminService] Logging out admin explicitly");
+  clearAdminToken(false);
+  try {
+    await fetch(`${API_URL}/auth/logout`, { method: "POST" });
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn("[adminService] Logout request error:", err.message);
+  }
   window.dispatchEvent(new Event("admin-auth-changed"));
 }
 
@@ -30,14 +45,27 @@ async function parseResponse(response) {
   const body = await response.json().catch(() => ({}));
 
   if (response.status === 401) {
-    clearAdminToken();
+    if (import.meta.env.DEV) console.warn("[adminService] Received 401 Unauthorized, clearing token locally");
+    clearAdminToken(true);
   }
 
   if (!response.ok) {
-    const error = new Error(body.message || "Admin request failed.");
+    let errorMsg = body.message;
+    if (response.status === 429) {
+      const retryHeader = response.headers?.get("Retry-After");
+      if (retryHeader && Number(retryHeader) > 0) {
+        const secs = Number(retryHeader);
+        const mins = Math.ceil(secs / 60);
+        errorMsg = body.message || (secs < 60 ? `Too many attempts. Please wait ${secs}s before trying again.` : `Too many attempts. Please try again after ${mins} minute${mins > 1 ? "s" : ""}.`);
+      } else {
+        errorMsg = body.message || "Too many attempts. Please try again after a few minutes.";
+      }
+    } else if (!errorMsg) {
+      errorMsg = "Admin request failed.";
+    }
+    const error = new Error(errorMsg);
     error.status = response.status;
     error.response = body;
-    error.errors = body.errors || body.invalidRows || body.notFound || [];
     throw error;
   }
 
@@ -45,6 +73,7 @@ async function parseResponse(response) {
 }
 
 export async function loginAdmin(credentials) {
+  if (import.meta.env.DEV) console.log("[adminService] Calling POST /auth/login for:", credentials?.email);
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -55,6 +84,7 @@ export async function loginAdmin(credentials) {
 }
 
 export async function getAdminProfile() {
+  if (import.meta.env.DEV) console.log("[adminService] Calling GET /auth/me");
   const response = await fetch(`${API_URL}/auth/me`, {
     headers: authHeaders(),
   });
@@ -448,28 +478,6 @@ export async function updateNextCertificateNumber(nextCertificateNumber) {
   return parseResponse(response);
 }
 
-export async function importApprovedStudentsExcel(file) {
-  const formData = new FormData();
-  formData.append("excel", file);
-  const response = await fetch(`${API_URL}/approved-students/import-excel`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: formData,
-  });
-  return parseResponse(response);
-}
-
-export async function importStudentsExcel(file) {
-  const formData = new FormData();
-  formData.append("excel", file);
-  const response = await fetch(`${API_URL}/students/import`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: formData,
-  });
-  return parseResponse(response);
-}
-
 export async function createPdfUrl(response) {
   let blob;
   if (response && response.data instanceof Blob) {
@@ -515,3 +523,21 @@ export async function exportApplicationsExcel() {
   a.remove();
   window.URL.revokeObjectURL(downloadUrl);
 }
+
+export async function importAdminStudents(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_URL}/students/import`, {
+    method: "POST",
+    headers: {
+      ...authHeaders(),
+    },
+    credentials: "include",
+    body: formData,
+  });
+
+  return parseResponse(response);
+}
+
+
