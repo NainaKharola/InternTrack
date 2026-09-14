@@ -33,23 +33,66 @@ function DetailGrid({ title, rows }) {
   );
 }
 
-function FileLink({ label, href, download }) {
+function FileLink({ label, href, download, onError }) {
+  const [downloading, setDownloading] = useState(false);
+
   if (!href) return null;
 
   const handleClick = async (e) => {
     if (!download) return;
     e.preventDefault();
+    if (downloading) return;
+
     try {
-      const response = await fetch(getUploadUrl(href));
+      setDownloading(true);
+      if (onError) onError("");
+
+      const urlToFetch = getUploadUrl(href);
+      const response = await fetch(urlToFetch, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let errorMsg = `Unable to download ${label || "document"}. Please contact the administrator.`;
+        try {
+          const contentType = response.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            const errData = await response.json();
+            if (errData && errData.message) {
+              errorMsg = errData.message;
+            }
+          }
+        } catch {
+          // not json
+        }
+        throw new Error(errorMsg);
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const errData = await response.json();
+        throw new Error(errData.message || `Unable to download ${label || "document"}. Please contact the administrator.`);
+      }
+
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = url;
+      link.href = downloadUrl;
       link.download = typeof download === "string" ? download : "document.pdf";
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
     } catch (err) {
       console.error("Download failed:", err);
+      const message = err.message || `Unable to download ${label || "document"}. Please contact the administrator.`;
+      if (onError) {
+        onError(message);
+      } else {
+        alert(message);
+      }
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -60,6 +103,7 @@ function FileLink({ label, href, download }) {
       target={download ? undefined : "_blank"}
       onClick={handleClick}
       rel="noreferrer"
+      style={downloading ? { opacity: 0.7, pointerEvents: "none" } : undefined}
     >
       {label}
     </a>
@@ -85,6 +129,7 @@ function StudentDashboard() {
   const [firstQuarterMessage, setFirstQuarterMessage] = useState("");
   const [savingSecondQuarter, setSavingSecondQuarter] = useState(false);
   const [secondQuarterMessage, setSecondQuarterMessage] = useState("");
+  const [documentError, setDocumentError] = useState("");
 
   useEffect(() => {
     if (!credentials) {
@@ -386,17 +431,24 @@ function StudentDashboard() {
               label="Download Declaration Form (Form 1)"
               href={studentDocumentUrl("declaration", credentials)}
               download="Declaration-Form.pdf"
+              onError={setDocumentError}
             />
             <FileLink
               label="Download Character Certificate (Form 2)"
               href={studentDocumentUrl("character", credentials)}
               download="Character-Certificate.pdf"
+              onError={setDocumentError}
             />
           </div>
         ) : (
           <p className="admin-muted">
             Documents to be filled become available after your application is
             approved.
+          </p>
+        )}
+        {documentError && (
+          <p className="admin-error" style={{ marginTop: "12px" }}>
+            {documentError}
           </p>
         )}
       </section>

@@ -34,7 +34,11 @@ async function parseResponse(response) {
   }
 
   if (!response.ok) {
-    throw new Error(body.message || "Admin request failed.");
+    const error = new Error(body.message || "Admin request failed.");
+    error.status = response.status;
+    error.response = body;
+    error.errors = body.errors || body.invalidRows || body.notFound || [];
+    throw error;
   }
 
   return body;
@@ -444,6 +448,28 @@ export async function updateNextCertificateNumber(nextCertificateNumber) {
   return parseResponse(response);
 }
 
+export async function importApprovedStudentsExcel(file) {
+  const formData = new FormData();
+  formData.append("excel", file);
+  const response = await fetch(`${API_URL}/approved-students/import-excel`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
+  return parseResponse(response);
+}
+
+export async function importStudentsExcel(file) {
+  const formData = new FormData();
+  formData.append("excel", file);
+  const response = await fetch(`${API_URL}/students/import`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
+  return parseResponse(response);
+}
+
 export async function createPdfUrl(response) {
   let blob;
   if (response && response.data instanceof Blob) {
@@ -489,4 +515,3 @@ export async function exportApplicationsExcel() {
   a.remove();
   window.URL.revokeObjectURL(downloadUrl);
 }
-

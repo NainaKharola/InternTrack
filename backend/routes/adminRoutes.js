@@ -42,8 +42,18 @@ const createGyapanRouter = require("./gyapanRoutes");
 const { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations, saveProformaConfig, updateCertificateNumber } = require("../controllers/administrationController");
 const { listColleges, createCollege, editCollege, removeCollege } = require("../controllers/collegeController");
 const managementController = require("../controllers/managementController");
+const { importApprovedStudentsExcel, importStudentsExcel } = require("../controllers/excelImportController");
 
 const router = express.Router();
+const excelImportUpload = require("multer")({
+  storage: require("multer").memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter(req, file, callback) {
+    const allowedTypes = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
+    const allowedName = /\.xlsx?$/i.test(file.originalname || "");
+    callback(allowedTypes.includes(file.mimetype) && allowedName ? null : new Error("Upload an .xlsx or .xls Excel file only."), allowedTypes.includes(file.mimetype) && allowedName);
+  },
+});
 
 router.post("/auth/register", registerAdmin);
 router.post("/auth/login", loginAdmin);
@@ -92,6 +102,8 @@ router.get("/recommended-by-options", protectAdmin, (req, res) => {
 });
 
 router.get("/applications/export", protectAdmin, exportApplications);
+router.post("/approved-students/import-excel", protectAdmin, (req, res, next) => excelImportUpload.single("excel")(req, res, (error) => error ? res.status(400).json({ success: false, message: error.message }) : next()), importApprovedStudentsExcel);
+router.post("/students/import", protectAdmin, (req, res, next) => excelImportUpload.single("excel")(req, res, (error) => error ? res.status(400).json({ success: false, message: error.message }) : next()), importStudentsExcel);
 router.get("/students", protectAdmin, getStudents);
 router.get("/certificates/students", protectAdmin, getCertificateStudents);
 router.post("/certificates/download", protectAdmin, downloadCertificates);

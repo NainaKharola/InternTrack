@@ -58,7 +58,8 @@ export async function fetchStudentDashboard(credentials) {
 }
 
 export function studentDocumentUrl(type, credentials) {
-  return `${API_URL}/students/documents/${type}?token=${credentials.token}`;
+  const token = credentials?.token ? `?token=${encodeURIComponent(credentials.token)}` : "";
+  return `${API_URL}/students/documents/${type}${token}`;
 }
 
 export async function uploadCompletedDocuments(credentials, file) {

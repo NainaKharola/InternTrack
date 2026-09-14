@@ -470,6 +470,11 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
     </label>
 
     <label className="admin-field">
+      <span>CGPA</span>
+      <input value={student.cgpa ?? ""} readOnly aria-label="CGPA" />
+    </label>
+
+    <label className="admin-field">
       <span>From Date</span>
       <input
         type="date"

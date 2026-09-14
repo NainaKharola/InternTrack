@@ -37,3 +37,6 @@ backend/uploads/results/*
 !backend/uploads/results/.gitkeep
 
 backend/exports/
+*.xlsx
+*.xls
+test_*.html

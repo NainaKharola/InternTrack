@@ -205,10 +205,15 @@ function AdminDashboard() {
 
   useEffect(() => {
     if (quarterlySubView === "proforma") {
-      const approvedPaid = allStudents.filter(
-        (s) => s.status === "Approved" && s.internshipType === "Paid"
-      );
-      const filtered = approvedPaid.filter((s) => {
+      const isResigned = (s) => {
+        const val = s.resignationStatus ?? s.trainingManagement?.resignationStatus;
+        if (typeof val === "boolean") return val;
+        if (typeof val === "number") return val === 1;
+        const str = String(val || "").trim().toLowerCase();
+        return str === "yes" || str === "true" || str === "1";
+      };
+
+      const filtered = allStudents.filter((s) => {
         const joining = s.trainingManagement?.fromDate || "";
         if (proformaFromDate && proformaToDate) {
           const isInSelectedRange = joining >= proformaFromDate && joining <= proformaToDate;
@@ -219,10 +224,16 @@ function AdminDashboard() {
       const mapped = filtered.map((student) => {
         const project = student.paidInternshipProjectDetails || {};
         const training = student.trainingManagement || {};
-        const discipline = `${student.course || ""} - ${student.branch || ""}`;
+        const discipline = student.course && student.branch
+          ? `${student.course} - ${student.branch}`
+          : (student.course || student.branch || "");
         const joiningDate = training.fromDate ? formatReportDate(training.fromDate) : "";
         const completionDate = training.toDate ? formatReportDate(training.toDate) : "";
-        const resignationDate = student.resignationStatus === "Yes" && student.resignationDate ? formatReportDate(student.resignationDate) : "";
+        const hasResigned = isResigned(student);
+        const resignationDate = hasResigned && (student.resignationDate || training.resignationDate)
+          ? formatReportDate(student.resignationDate || training.resignationDate)
+          : "";
+        const remarks = training.remarks || student.remarks || "";
 
         return {
           _id: student._id,
@@ -238,7 +249,7 @@ function AdminDashboard() {
           achievements: project.achievements || "",
           completionDate: completionDate || "",
           resignationDate: resignationDate || "",
-          remarks: ""
+          remarks: remarks || ""
         };
       });
       setProformaStudents(mapped);
@@ -1918,9 +1929,25 @@ function AdminDashboard() {
         </div>
         <div className="admin-topbar__actions">
           {currentView === "approved-students" && (
-            <button className="admin-secondary-btn" type="button" onClick={openAdministration}>
-              System Configurations
-            </button>
+            <>
+              <button className="admin-secondary-btn" type="button" onClick={openAdministration}>
+                System Configurations
+              </button>
+              <button
+                className="admin-secondary-btn"
+                type="button"
+                onClick={() => {
+                  setExcelImportMode("students");
+                  setExcelImportOpen(true);
+                  setExcelFile(null);
+                  setExcelImportMessage("");
+                  setExcelImportErrors([]);
+                  setExcelImportSummary(null);
+                }}
+              >
+                Import Students
+              </button>
+            </>
           )}
           {currentView !== "home" && (
             <button className="admin-secondary-btn" type="button" onClick={handleGoHomeWithCheck}>
