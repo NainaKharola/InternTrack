@@ -41,6 +41,15 @@ function FileLink({ label, href, download }) {
     e.preventDefault();
     try {
       const response = await fetch(getUploadUrl(href));
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Download failed with status ${response.status}`);
+      }
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to download document.");
+      }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -50,6 +59,7 @@ function FileLink({ label, href, download }) {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Download failed:", err);
+      alert(err.message || "Failed to download document.");
     }
   };
 
