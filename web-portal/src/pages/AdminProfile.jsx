@@ -8,7 +8,10 @@ import {
   createSubUserPassword,
   fetchUserActivityLog,
   downloadUserActivityExport,
-  setupRecoveryInfo,
+  fetchSecurityQuestions,
+  saveSecurityQuestion,
+  updateSecurityQuestion,
+  deleteSecurityQuestion,
 } from "../services/adminService";
 import "../styles/admin.css";
 
@@ -48,10 +51,21 @@ export default function AdminProfile() {
   const [changePassLoading, setChangePassLoading] = useState(false);
   const [changePassError, setChangePassError] = useState("");
 
-  // Secret Recovery States
-  const [secretQuestion, setSecretQuestion] = useState("");
-  const [secretAnswer, setSecretAnswer] = useState("");
-  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  // Secret Recovery Questions State
+  const [questionsList, setQuestionsList] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
+  const [addQuestionForm, setAddQuestionForm] = useState({ question: "", answer: "" });
+  const [addQuestionLoading, setAddQuestionLoading] = useState(false);
+  const [addQuestionError, setAddQuestionError] = useState("");
+
+  const [questionToEdit, setQuestionToEdit] = useState(null);
+  const [editQuestionForm, setEditQuestionForm] = useState({ question: "", answer: "" });
+  const [editQuestionLoading, setEditQuestionLoading] = useState(false);
+  const [editQuestionError, setEditQuestionError] = useState("");
+
+  const [questionToDelete, setQuestionToDelete] = useState(null);
+  const [deleteQuestionLoading, setDeleteQuestionLoading] = useState(false);
 
   // Form States - Add User
   const [addUserForm, setAddUserForm] = useState({
@@ -241,32 +255,103 @@ export default function AdminProfile() {
     }
   };
 
-    useEffect(() => {
-    if (admin?.secretQuestion) {
-      setSecretQuestion(admin.secretQuestion);
-    }
-  }, [admin]);
-
-  const handleSaveRecovery = async (e) => {
-    e.preventDefault();
-    if (!secretQuestion.trim()) {
-      setErrorMsg("Secret question is required.");
-      return;
-    }
-    if (!admin?.recoverySetup && !secretAnswer.trim()) {
-      setErrorMsg("Secret answer is required.");
-      return;
-    }
-    setRecoveryLoading(true);
+  // Load Security Questions
+  const loadSecurityQuestions = async () => {
+    setQuestionsLoading(true);
     try {
-      await setupRecoveryInfo({ secretQuestion, secretAnswer });
-      setSuccessMsg("Password recovery settings updated successfully.");
-      setSecretAnswer("");
+      const response = await fetchSecurityQuestions();
+      setQuestionsList(response.questions || []);
+    } catch (err) {
+      console.error("Failed to load security questions:", err);
+    } finally {
+      setQuestionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSecurityQuestions();
+  }, []);
+
+  // Handle Add Security Question
+  const handleAddQuestionSubmit = async (e) => {
+    e.preventDefault();
+    setAddQuestionError("");
+    if (!addQuestionForm.question.trim() || !addQuestionForm.answer.trim()) {
+      setAddQuestionError("Both question and answer are required.");
+      return;
+    }
+    setAddQuestionLoading(true);
+    try {
+      await saveSecurityQuestion({
+        question: addQuestionForm.question.trim(),
+        answer: addQuestionForm.answer.trim(),
+      });
+      setSuccessMsg("Security question added successfully.");
+      setIsAddQuestionOpen(false);
+      setAddQuestionForm({ question: "", answer: "" });
+      loadSecurityQuestions();
       await validateSession();
     } catch (err) {
-      setErrorMsg(err.message || "Failed to save password recovery settings.");
+      setAddQuestionError(err.message || "Failed to add security question.");
     } finally {
-      setRecoveryLoading(false);
+      setAddQuestionLoading(false);
+    }
+  };
+
+  // Open Edit Security Question Modal
+  const handleOpenEditQuestion = (item) => {
+    setQuestionToEdit(item);
+    setEditQuestionForm({
+      question: item.question,
+      answer: ""
+    });
+    setEditQuestionError("");
+  };
+
+  // Handle Edit Security Question
+  const handleEditQuestionSubmit = async (e) => {
+    e.preventDefault();
+    setEditQuestionError("");
+    if (!editQuestionForm.question.trim()) {
+      setEditQuestionError("Question text is required.");
+      return;
+    }
+    setEditQuestionLoading(true);
+    try {
+      const payload = {
+        question: editQuestionForm.question.trim(),
+      };
+      if (editQuestionForm.answer.trim()) {
+        payload.answer = editQuestionForm.answer.trim();
+      }
+      await updateSecurityQuestion(questionToEdit.id, payload);
+      setSuccessMsg("Security question updated successfully.");
+      setQuestionToEdit(null);
+      setEditQuestionForm({ question: "", answer: "" });
+      loadSecurityQuestions();
+      await validateSession();
+    } catch (err) {
+      setEditQuestionError(err.message || "Failed to update security question.");
+    } finally {
+      setEditQuestionLoading(false);
+    }
+  };
+
+  // Handle Delete Security Question
+  const handleDeleteQuestionConfirm = async () => {
+    if (!questionToDelete) return;
+    setDeleteQuestionLoading(true);
+    try {
+      await deleteSecurityQuestion(questionToDelete.id);
+      setSuccessMsg("Security question deleted successfully.");
+      setQuestionToDelete(null);
+      loadSecurityQuestions();
+      await validateSession();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to delete security question.");
+      setQuestionToDelete(null);
+    } finally {
+      setDeleteQuestionLoading(false);
     }
   };
 
@@ -419,36 +504,81 @@ export default function AdminProfile() {
             <span className="administration-icon" aria-hidden="true">🔒</span>
             <div>
               <h2>Password Recovery Setup</h2>
-              <p>Configure a secret question and answer to recover your password if forgotten.</p>
+              <p>Configure secret questions and answers to recover your password if forgotten.</p>
             </div>
           </div>
-          <form onSubmit={handleSaveRecovery} style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "16px", maxWidth: "500px" }}>
-            <label className="admin-field">
-              <span>Secret Question</span>
-              <input
-                type="text"
-                placeholder="e.g. What was the name of your first school?"
-                value={secretQuestion}
-                onChange={(e) => setSecretQuestion(e.target.value)}
-                required
-              />
-            </label>
-            <label className="admin-field">
-              <span>Secret Answer</span>
-              <input
-                type="password"
-                placeholder={admin?.recoverySetup ? "Leave blank to keep existing or enter new answer" : "Enter answer"}
-                value={secretAnswer}
-                onChange={(e) => setSecretAnswer(e.target.value)}
-                required={!admin?.recoverySetup}
-              />
-            </label>
-            <div>
-              <button className="admin-primary-btn" type="submit" disabled={recoveryLoading}>
-                {recoveryLoading ? "Saving..." : "Save Recovery Details"}
-              </button>
+
+          <div className="recommendation-toolbar" style={{ marginTop: "20px" }}>
+            <p>Set up one or more security questions for account recovery. Secret answers are never displayed.</p>
+            <button
+              className="admin-primary-btn"
+              type="button"
+              onClick={() => {
+                setAddQuestionForm({ question: "", answer: "" });
+                setAddQuestionError("");
+                setIsAddQuestionOpen(true);
+              }}
+            >
+              + Add Recovery Question
+            </button>
+          </div>
+
+          {questionsLoading ? (
+            <div className="administration-loading"><span className="administration-spinner" /> Loading recovery questions...</div>
+          ) : (
+            <div className="recommendation-table-wrap" style={{ marginTop: "16px" }}>
+              <table className="recommendation-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: "8%" }}>S.No.</th>
+                    <th style={{ width: "50%" }}>Secret Question</th>
+                    <th style={{ width: "22%" }}>Secret Answer</th>
+                    <th style={{ width: "20%" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {questionsList.map((q, idx) => (
+                    <tr key={q.id || idx}>
+                      <td>{idx + 1}</td>
+                      <td><strong>{q.question}</strong></td>
+                      <td>
+                        <span style={{ fontFamily: "monospace", letterSpacing: "2px", color: "#64748b" }}>
+                          ••••••••
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <button
+                            className="admin-secondary-btn admin-icon-button"
+                            style={{ padding: "4px 10px", fontSize: "0.85rem" }}
+                            type="button"
+                            onClick={() => handleOpenEditQuestion(q)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="admin-danger-btn admin-icon-button"
+                            style={{ padding: "4px 10px", fontSize: "0.85rem" }}
+                            type="button"
+                            onClick={() => setQuestionToDelete(q)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {questionsList.length === 0 && (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: "center", color: "#64748b", padding: "24px" }}>
+                        No recovery questions configured. Click <strong>+ Add Recovery Question</strong> to set one up.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          </form>
+          )}
         </section>
 
         {isMainAdmin && (
@@ -958,6 +1088,130 @@ export default function AdminProfile() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Security Question Modal */}
+      {isAddQuestionOpen && (
+        <div className="administration-dialog-backdrop" role="presentation">
+          <form className="administration-dialog" onSubmit={handleAddQuestionSubmit} style={{ maxWidth: "480px" }}>
+            <h2>Add Recovery Question</h2>
+            <p>Enter a security question and secret answer for password recovery.</p>
+
+            {addQuestionError && <p className="admin-error" style={{ marginBottom: "12px" }}>{addQuestionError}</p>}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <label className="admin-field">
+                <span>Secret Question</span>
+                <input
+                  type="text"
+                  placeholder="e.g. What was the name of your first school?"
+                  value={addQuestionForm.question}
+                  onChange={(e) => setAddQuestionForm({ ...addQuestionForm, question: e.target.value })}
+                  required
+                />
+              </label>
+
+              <label className="admin-field">
+                <span>Secret Answer</span>
+                <input
+                  type="password"
+                  placeholder="Enter answer (case-insensitive)"
+                  value={addQuestionForm.answer}
+                  onChange={(e) => setAddQuestionForm({ ...addQuestionForm, answer: e.target.value })}
+                  required
+                />
+              </label>
+            </div>
+
+            <div className="administration-dialog__actions" style={{ marginTop: "20px" }}>
+              <button
+                className="admin-secondary-btn"
+                type="button"
+                onClick={() => { setIsAddQuestionOpen(false); setAddQuestionError(""); }}
+              >
+                Cancel
+              </button>
+              <button className="admin-primary-btn" type="submit" disabled={addQuestionLoading}>
+                {addQuestionLoading ? "Saving..." : "Save Question"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Edit Security Question Modal */}
+      {questionToEdit && (
+        <div className="administration-dialog-backdrop" role="presentation">
+          <form className="administration-dialog" onSubmit={handleEditQuestionSubmit} style={{ maxWidth: "480px" }}>
+            <h2>Edit Recovery Question</h2>
+            <p>Update your question text or replace the secret answer.</p>
+
+            {editQuestionError && <p className="admin-error" style={{ marginBottom: "12px" }}>{editQuestionError}</p>}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <label className="admin-field">
+                <span>Secret Question</span>
+                <input
+                  type="text"
+                  value={editQuestionForm.question}
+                  onChange={(e) => setEditQuestionForm({ ...editQuestionForm, question: e.target.value })}
+                  required
+                />
+              </label>
+
+              <label className="admin-field">
+                <span>New Secret Answer (Optional)</span>
+                <input
+                  type="password"
+                  placeholder="Leave blank to keep existing answer"
+                  value={editQuestionForm.answer}
+                  onChange={(e) => setEditQuestionForm({ ...editQuestionForm, answer: e.target.value })}
+                />
+              </label>
+            </div>
+
+            <div className="administration-dialog__actions" style={{ marginTop: "20px" }}>
+              <button
+                className="admin-secondary-btn"
+                type="button"
+                onClick={() => { setQuestionToEdit(null); setEditQuestionError(""); }}
+              >
+                Cancel
+              </button>
+              <button className="admin-primary-btn" type="submit" disabled={editQuestionLoading}>
+                {editQuestionLoading ? "Saving..." : "Update Question"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Delete Security Question Confirmation Modal */}
+      {questionToDelete && (
+        <div className="administration-dialog-backdrop" role="presentation">
+          <div className="administration-dialog" style={{ maxWidth: "440px" }}>
+            <h2>Delete Recovery Question?</h2>
+            <p>Are you sure you want to remove the question: <strong>"{questionToDelete.question}"</strong>?</p>
+            {questionsList.length <= 1 && (
+              <p style={{ color: "#b91c1c", backgroundColor: "#fef2f2", padding: "10px", borderRadius: "6px", fontSize: "0.85rem", border: "1px solid #fecaca" }}>
+                ⚠️ <strong>Warning:</strong> If you delete your only recovery question, you will not be able to recover your account if you forget your password.
+              </p>
+            )}
+            <div className="administration-dialog__actions" style={{ marginTop: "20px" }}>
+              <button className="admin-secondary-btn" type="button" onClick={() => setQuestionToDelete(null)}>
+                Cancel
+              </button>
+              <button
+                className="admin-danger-btn"
+                type="button"
+                disabled={deleteQuestionLoading}
+                onClick={handleDeleteQuestionConfirm}
+              >
+                {deleteQuestionLoading ? "Deleting..." : "Delete Question"}
+              </button>
             </div>
           </div>
         </div>

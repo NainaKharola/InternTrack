@@ -428,43 +428,6 @@ export async function resetPasswordRecovery(payload) {
   return parseResponse(response);
 }
 
-export async function getSecurityQuestions() {
-  const response = await fetch(`${API_URL}/auth/security-questions`, {
-    headers: authHeaders(),
-  });
-  return parseResponse(response);
-}
-
-export async function saveSecurityQuestion(payload) {
-  const response = await fetch(`${API_URL}/auth/security-questions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(payload),
-  });
-  return parseResponse(response);
-}
-
-export async function deleteSecurityQuestion(id) {
-  const response = await fetch(`${API_URL}/auth/security-questions/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  return parseResponse(response);
-}
-
-export async function getForgotPasswordQuestions(email) {
-  const response = await fetch(`${API_URL}/auth/forgot-password-questions?email=${encodeURIComponent(email)}`);
-  return parseResponse(response);
-}
-
-export async function resetPasswordQuestions(payload) {
-  const response = await fetch(`${API_URL}/auth/reset-password-questions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return parseResponse(response);
-}
 
 export async function updateNextCertificateNumber(nextCertificateNumber) {
   const response = await fetch(`${API_URL}/administration/certificate-number`, {
@@ -524,20 +487,90 @@ export async function exportApplicationsExcel() {
   window.URL.revokeObjectURL(downloadUrl);
 }
 
+export async function fetchSecurityQuestions() {
+  const response = await fetch(`${API_URL}/auth/security-questions`, {
+    headers: authHeaders(),
+  });
+  return parseResponse(response);
+}
+
+export async function saveSecurityQuestion(payload) {
+  const response = await fetch(`${API_URL}/auth/security-questions`, {
+    method: "POST",
+    headers: {
+      ...authHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse(response);
+}
+
+export async function updateSecurityQuestion(id, payload) {
+  const response = await fetch(`${API_URL}/auth/security-questions/${id}`, {
+    method: "PUT",
+    headers: {
+      ...authHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse(response);
+}
+
+export async function deleteSecurityQuestion(id) {
+  const response = await fetch(`${API_URL}/auth/security-questions/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  return parseResponse(response);
+}
+
+export async function getForgotPasswordQuestions(email) {
+  const params = new URLSearchParams({ email: String(email || "").trim() });
+  const response = await fetch(`${API_URL}/auth/forgot-password-questions?${params.toString()}`);
+  return parseResponse(response);
+}
+
+export async function verifyRecoveryAnswer(payload) {
+  const response = await fetch(`${API_URL}/auth/recovery/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse(response);
+}
+
+export async function resetPasswordWithToken(payload) {
+  const response = await fetch(`${API_URL}/auth/recovery/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse(response);
+}
+
+export async function resetPasswordQuestions(payload) {
+  const response = await fetch(`${API_URL}/auth/reset-password-questions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse(response);
+}
+
 export async function importAdminStudents(file) {
   const formData = new FormData();
   formData.append("file", file);
 
   const response = await fetch(`${API_URL}/students/import`, {
     method: "POST",
-    headers: {
-      ...authHeaders(),
-    },
-    credentials: "include",
+    headers: authHeaders(),
     body: formData,
   });
 
   return parseResponse(response);
 }
+
 
 

@@ -17,6 +17,8 @@ const {
   saveSecurityQuestion,
   deleteSecurityQuestion,
   getForgotPasswordQuestions,
+  verifyRecoveryAnswer,
+  resetPasswordWithToken,
   resetPasswordQuestions,
 } = require("../controllers/adminAuthController");
 const {
@@ -43,7 +45,7 @@ const createGyapanRouter = require("./gyapanRoutes");
 const { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations, saveProformaConfig, updateCertificateNumber } = require("../controllers/administrationController");
 const { listColleges, createCollege, editCollege, removeCollege } = require("../controllers/collegeController");
 const managementController = require("../controllers/managementController");
-const { authLimiter } = require("../middleware/rateLimiter");
+const { authLimiter, recoveryLimiter } = require("../middleware/rateLimiter");
 
 const router = express.Router();
 
@@ -55,11 +57,21 @@ router.get("/profile", protectAdmin, requireMainAdmin, getAdminProfile);
 router.put("/change-password", protectAdmin, requireMainAdmin, changeAdminPassword);
 router.post("/auth/setup-recovery", protectAdmin, setupRecoveryInfo);
 router.post("/auth/reset-password-recovery", resetPasswordRecovery);
+
+// Secret Questions Management (Authenticated Admin)
 router.get("/auth/security-questions", protectAdmin, getSecurityQuestions);
 router.post("/auth/security-questions", protectAdmin, saveSecurityQuestion);
+router.put("/auth/security-questions/:id", protectAdmin, (req, res) => {
+  req.body.id = req.params.id;
+  return saveSecurityQuestion(req, res);
+});
 router.delete("/auth/security-questions/:id", protectAdmin, deleteSecurityQuestion);
-router.get("/auth/forgot-password-questions", getForgotPasswordQuestions);
-router.post("/auth/reset-password-questions", resetPasswordQuestions);
+
+// Password Recovery Flow (Public, Rate-Limited)
+router.get("/auth/forgot-password-questions", recoveryLimiter, getForgotPasswordQuestions);
+router.post("/auth/recovery/verify", recoveryLimiter, verifyRecoveryAnswer);
+router.post("/auth/recovery/reset-password", recoveryLimiter, resetPasswordWithToken);
+router.post("/auth/reset-password-questions", recoveryLimiter, resetPasswordQuestions);
 router.post("/users", protectAdmin, requireMainAdmin, createSubUser);
 router.get("/users", protectAdmin, requireMainAdmin, listSubUsers);
 router.delete("/users/:id", protectAdmin, requireMainAdmin, deleteSubUser);

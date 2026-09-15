@@ -602,66 +602,131 @@ async function exportUserActivityLog(req, res) {
   }
 }
 
+function signResetToken(admin) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is not configured.");
+  }
+  const jti = crypto.randomBytes(16).toString("hex");
+  const token = jwt.sign(
+    {
+      id: admin._id,
+      email: admin.email,
+      purpose: "password_reset",
+      jti,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "10m" }
+  );
+  return { token, jti };
+}
+
 async function getSecurityQuestions(req, res) {
   try {
     const admin = await Admin.findById(req.admin._id);
     if (!admin) {
       return res.status(404).json({ success: false, message: "Admin not found." });
     }
-    const questions = (admin.securityQuestions || []).map(q => ({
+    const list = Array.isArray(admin.securityQuestions) ? admin.securityQuestions : [];
+    // Migration fallback if legacy secretQuestion exists
+    if (list.length === 0 && admin.secretQuestion) {
+      list.push({
+        id: "default-1",
+        question: admin.secretQuestion,
+        answer_hash: admin.secretAnswer,
+        answer: admin.secretAnswer,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      admin.securityQuestions = list;
+      await admin.save();
+    }
+
+    const questions = list.map((q) => ({
       id: q.id,
       question: q.question,
-      answer: "••••••••"
+      answer: "••••••••",
+      created_at: q.created_at,
+      updated_at: q.updated_at,
     }));
     return res.status(200).json({ success: true, questions });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message || "Failed to load security questions." });
   }
 }
 
 async function saveSecurityQuestion(req, res) {
   try {
     const { id, question, answer } = req.body;
-    if (!question) {
-      return res.status(400).json({ success: false, message: "Question is required." });
+    if (!question || String(question).trim().length < 3) {
+      return res.status(400).json({ success: false, message: "Question must be at least 3 characters long." });
     }
     const admin = await Admin.findById(req.admin._id);
     if (!admin) {
       return res.status(404).json({ success: false, message: "Admin not found." });
     }
-    
-    admin.securityQuestions ||= [];
-    
+
+    admin.securityQuestions = Array.isArray(admin.securityQuestions) ? admin.securityQuestions : [];
+
     const bcrypt = require("bcryptjs");
     let hashedAnswer = "";
     if (answer && answer !== "••••••••") {
       hashedAnswer = await bcrypt.hash(answer.toLowerCase().trim(), 12);
     }
-    
+
     if (id) {
-      const existing = admin.securityQuestions.find(q => q.id === id);
+      const existing = admin.securityQuestions.find((q) => q.id === id);
       if (!existing) {
-        return res.status(404).json({ success: false, message: "Question not found." });
+        return res.status(404).json({ success: false, message: "Security question not found." });
       }
-      existing.question = question;
+      existing.question = question.trim();
+      existing.updated_at = new Date().toISOString();
       if (hashedAnswer) {
+        existing.answer_hash = hashedAnswer;
         existing.answer = hashedAnswer;
       }
-    } else {
-      if (!answer) {
-        return res.status(400).json({ success: false, message: "Answer is required." });
-      }
-      admin.securityQuestions.push({
-        id: crypto.randomBytes(8).toString("hex"),
-        question,
-        answer: hashedAnswer
+
+      await admin.save();
+
+      await logActivity({
+        req,
+        module: "Profile",
+        action: "Updated Security Question",
+        description: `Updated security question: "${existing.question}".`,
+        status: "Success",
       });
+
+      return res.status(200).json({ success: true, message: "Security question updated successfully." });
+    } else {
+      if (!answer || !answer.trim()) {
+        return res.status(400).json({ success: false, message: "Answer is required when creating a new question." });
+      }
+      const newQuestion = {
+        id: crypto.randomBytes(8).toString("hex"),
+        question: question.trim(),
+        answer_hash: hashedAnswer,
+        answer: hashedAnswer,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      admin.securityQuestions.push(newQuestion);
+      admin.recoverySetup = true;
+      admin.secretQuestion = newQuestion.question;
+      admin.secretAnswer = hashedAnswer;
+
+      await admin.save();
+
+      await logActivity({
+        req,
+        module: "Profile",
+        action: "Created Security Question",
+        description: `Added new security question: "${newQuestion.question}".`,
+        status: "Success",
+      });
+
+      return res.status(201).json({ success: true, message: "Security question created successfully.", question: { id: newQuestion.id, question: newQuestion.question, answer: "••••••••" } });
     }
-    
-    await admin.save();
-    return res.status(200).json({ success: true, message: "Security question saved successfully." });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message || "Failed to save security question." });
   }
 }
 
@@ -672,50 +737,132 @@ async function deleteSecurityQuestion(req, res) {
     if (!admin) {
       return res.status(404).json({ success: false, message: "Admin not found." });
     }
-    admin.securityQuestions = (admin.securityQuestions || []).filter(q => q.id !== id);
+
+    const currentQuestions = Array.isArray(admin.securityQuestions) ? admin.securityQuestions : [];
+    if (currentQuestions.length <= 1) {
+      return res.status(400).json({
+        success: false,
+        message: "You must keep at least one recovery question configured to use password recovery.",
+      });
+    }
+
+    const target = currentQuestions.find((q) => q.id === id);
+    if (!target) {
+      return res.status(404).json({ success: false, message: "Security question not found." });
+    }
+
+    admin.securityQuestions = currentQuestions.filter((q) => q.id !== id);
+    if (admin.securityQuestions.length === 0) {
+      admin.recoverySetup = false;
+      admin.secretQuestion = "";
+      admin.secretAnswer = "";
+    } else {
+      admin.secretQuestion = admin.securityQuestions[0].question;
+      admin.secretAnswer = admin.securityQuestions[0].answer_hash || admin.securityQuestions[0].answer;
+    }
+
     await admin.save();
+
+    await logActivity({
+      req,
+      module: "Profile",
+      action: "Deleted Security Question",
+      description: `Deleted security question: "${target.question}".`,
+      status: "Success",
+    });
+
     return res.status(200).json({ success: true, message: "Security question deleted successfully." });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message || "Failed to delete security question." });
   }
 }
 
 async function getForgotPasswordQuestions(req, res) {
   try {
-    const { email } = req.query;
+    const email = String(req.query.email || req.body.email || "").trim().toLowerCase();
     if (!email) {
-      return res.status(400).json({ success: false, message: "Email is required." });
+      return res.status(400).json({ success: false, message: "Email address is required." });
     }
     const admin = await Admin.findOne({ email });
     if (!admin) {
-      return res.status(404).json({ success: false, message: "Admin not found." });
+      return res.status(404).json({ success: false, message: "No recovery questions configured for this email." });
     }
-    
-    if (Array.isArray(admin.securityQuestions) && admin.securityQuestions.length > 0) {
+
+    const list = Array.isArray(admin.securityQuestions) ? admin.securityQuestions : [];
+    if (list.length > 0) {
       return res.status(200).json({
         success: true,
-        questions: admin.securityQuestions.map(q => ({ id: q.id, question: q.question }))
+        questions: list.map((q) => ({ id: q.id, question: q.question })),
       });
     }
 
-    if (!admin.secretQuestion) {
-      return res.status(400).json({ success: false, message: "Admin does not have a secret question set up." });
+    if (admin.secretQuestion) {
+      return res.status(200).json({
+        success: true,
+        questions: [{ id: "secret", question: admin.secretQuestion }],
+      });
     }
-    
-    return res.status(200).json({
-      success: true,
-      questions: [{ id: "secret", question: admin.secretQuestion }]
-    });
+
+    return res.status(404).json({ success: false, message: "No recovery questions configured for this email." });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message || "Unable to look up recovery questions." });
   }
 }
 
-async function resetPasswordQuestions(req, res) {
+async function verifyRecoveryAnswer(req, res) {
   try {
-    const { email, answers, newPassword, confirmPassword } = req.body;
-    if (!email || !answers || !answers.length || !newPassword || !confirmPassword) {
-      return res.status(400).json({ success: false, message: "All fields are required." });
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const questionId = String(req.body.questionId || (req.body.answers?.[0]?.id) || "").trim();
+    const answer = String(req.body.answer || (req.body.answers?.[0]?.answer) || "").trim();
+
+    if (!email || !questionId || !answer) {
+      return res.status(400).json({ success: false, message: "Email, question ID, and answer are required." });
+    }
+
+    const admin = await Admin.findOne({ email }).select("+password +secretAnswer");
+    if (!admin) {
+      return res.status(400).json({ success: false, message: "Invalid recovery attempt." });
+    }
+
+    const isMatch = await admin.matchSecurityQuestionAnswer(questionId, answer);
+    if (!isMatch) {
+      await logActivity({
+        req: { ...req, admin },
+        module: "Authentication",
+        action: "Recovery Verification Failed",
+        description: `Failed recovery answer verification for email ${admin.email}.`,
+        status: "Failed",
+      });
+      return res.status(400).json({ success: false, message: "Incorrect answer. Please check and try again." });
+    }
+
+    const { token, jti } = signResetToken(admin);
+    admin.pendingResetJti = jti;
+    await admin.save();
+
+    await logActivity({
+      req: { ...req, admin },
+      module: "Authentication",
+      action: "Recovery Verification Succeeded",
+      description: `Successfully verified recovery question for email ${admin.email}.`,
+      status: "Success",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Answer verified successfully.",
+      resetToken: token,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Failed to verify recovery answer." });
+  }
+}
+
+async function resetPasswordWithToken(req, res) {
+  try {
+    const { resetToken, newPassword, confirmPassword } = req.body;
+    if (!resetToken || !newPassword || !confirmPassword) {
+      return res.status(400).json({ success: false, message: "Reset authorization token, new password, and confirm password are required." });
     }
     if (newPassword.length < 8) {
       return res.status(400).json({ success: false, message: "Password must be at least 8 characters long." });
@@ -723,49 +870,67 @@ async function resetPasswordQuestions(req, res) {
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ success: false, message: "Passwords do not match." });
     }
-    
-    const admin = await Admin.findOne({ email }).select("+password +secretAnswer");
+
+    let decoded;
+    try {
+      decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({ success: false, message: "Reset token has expired or is invalid. Please verify your answer again." });
+    }
+
+    if (decoded.purpose !== "password_reset") {
+      return res.status(400).json({ success: false, message: "Invalid reset token purpose." });
+    }
+
+    const admin = await Admin.findById(decoded.id);
     if (!admin) {
-      return res.status(404).json({ success: false, message: "Admin not found." });
+      return res.status(404).json({ success: false, message: "Admin account not found." });
     }
-    
-    const bcrypt = require("bcryptjs");
-    for (const ans of answers) {
-      if (ans.id === "secret") {
-        if (!admin.secretAnswer) {
-          return res.status(400).json({ success: false, message: "Secret answer is not configured." });
-        }
-        const isMatch = await admin.matchSecretAnswer(ans.answer);
-        if (!isMatch) {
-          return res.status(400).json({ success: false, message: "Incorrect answer." });
-        }
-      } else {
-        const q = (admin.securityQuestions || []).find(x => x.id === ans.id);
-        if (!q) {
-          return res.status(400).json({ success: false, message: "Invalid question ID." });
-        }
-        const isMatch = await bcrypt.compare(ans.answer.trim().toLowerCase(), q.answer);
-        if (!isMatch) {
-          return res.status(400).json({ success: false, message: "Incorrect answer." });
-        }
-      }
+
+    if (admin.pendingResetJti && admin.pendingResetJti !== decoded.jti) {
+      return res.status(400).json({ success: false, message: "This reset authorization has already been used. Please verify again." });
     }
-    
+
     admin.password = newPassword;
+    admin.pendingResetJti = null;
+    admin.tokenVersion = (admin.tokenVersion || 0) + 1;
     await admin.save();
-    
+
     await logActivity({
       req: { ...req, admin },
-      module: "Profile",
-      action: "Reset Password via Secret Question",
-      description: `Reset password via secret question for email ${email}.`,
+      module: "Authentication",
+      action: "Password Reset Completed",
+      description: `Password reset successfully via secret question recovery for email ${admin.email}.`,
       status: "Success",
     });
-    
-    return res.status(200).json({ success: true, message: "Password reset successfully." });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully. Please log in with your new password.",
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message || "Failed to reset password." });
   }
+}
+
+// Backward-compatible wrapper for any existing reset callers
+async function resetPasswordQuestions(req, res) {
+  if (req.body.resetToken) {
+    return resetPasswordWithToken(req, res);
+  }
+  const verifyRes = await verifyRecoveryAnswer(req, {
+    status: (code) => ({
+      json: (data) => ({ code, data })
+    })
+  });
+  if (verifyRes?.code && verifyRes.code !== 200) {
+    return res.status(verifyRes.code).json(verifyRes.data);
+  }
+  if (verifyRes?.data?.resetToken) {
+    req.body.resetToken = verifyRes.data.resetToken;
+    return resetPasswordWithToken(req, res);
+  }
+  return res.status(400).json({ success: false, message: "Recovery verification failed." });
 }
 
 module.exports = {
@@ -786,5 +951,7 @@ module.exports = {
   saveSecurityQuestion,
   deleteSecurityQuestion,
   getForgotPasswordQuestions,
+  verifyRecoveryAnswer,
+  resetPasswordWithToken,
   resetPasswordQuestions
 };

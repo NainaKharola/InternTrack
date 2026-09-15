@@ -25,6 +25,29 @@ const authLimiter = rateLimit({
   }
 });
 
+// Brute-force protection for password recovery requests and secret answer verification
+const recoveryLimiter = rateLimit({
+  windowMs: isDev ? 1 * 60 * 1000 : 15 * 60 * 1000,
+  max: isDev ? 30 : 5,
+  skipSuccessfulRequests: false,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    const retrySecs = Math.ceil(options.windowMs / 1000);
+    const retryMins = Math.ceil(retrySecs / 60);
+    res.setHeader("Retry-After", String(retrySecs));
+    if (isDev) {
+      console.warn(`[recoveryLimiter] 429 BLOCKED: ${req.method} ${req.originalUrl} from IP: ${req.ip}`);
+    }
+    return res.status(429).json({
+      success: false,
+      message: isDev
+        ? `Too many recovery attempts. Please wait ${retrySecs} seconds before trying again.`
+        : `Too many recovery attempts. Please try again after ${retryMins} minutes.`
+    });
+  }
+});
+
 // General portal-wide API rate limiter
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -41,4 +64,4 @@ const generalLimiter = rateLimit({
   }
 });
 
-module.exports = { authLimiter, generalLimiter };
+module.exports = { authLimiter, recoveryLimiter, generalLimiter };

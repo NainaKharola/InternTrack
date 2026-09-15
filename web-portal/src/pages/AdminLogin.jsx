@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { loginAdmin, setAdminToken, getForgotPasswordQuestions, resetPasswordQuestions } from "../services/adminService";
+import {
+  loginAdmin,
+  setAdminToken,
+  getForgotPasswordQuestions,
+  verifyRecoveryAnswer,
+  resetPasswordWithToken,
+} from "../services/adminService";
 import "../styles/admin.css";
 
 function AdminLogin() {
@@ -12,10 +18,11 @@ function AdminLogin() {
   // Forgot Password States
   const [isForgotOpen, setIsForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotStep, setForgotStep] = useState(1);
+  const [forgotStep, setForgotStep] = useState(1); // 1: Email, 2: Answer Question, 3: New Password
   const [forgotQuestions, setForgotQuestions] = useState([]);
-  const [answer1, setAnswer1] = useState("");
-  const [answer2, setAnswer2] = useState("");
+  const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [secretAnswer, setSecretAnswer] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [forgotError, setForgotError] = useState("");
@@ -40,6 +47,7 @@ function AdminLogin() {
     }
   };
 
+  // Step 1: Submit Email to fetch questions
   const handleVerifyEmail = async (e) => {
     e.preventDefault();
     setForgotError("");
@@ -49,8 +57,14 @@ function AdminLogin() {
     }
     setForgotBusy(true);
     try {
-      const response = await getForgotPasswordQuestions(forgotEmail);
-      setForgotQuestions(response.questions || []);
+      const response = await getForgotPasswordQuestions(forgotEmail.trim());
+      const questions = response.questions || [];
+      if (!questions.length) {
+        throw new Error("No recovery questions configured for this admin account. Please contact an administrator.");
+      }
+      setForgotQuestions(questions);
+      setSelectedQuestionId(questions[0].id);
+      setSecretAnswer("");
       setForgotStep(2);
     } catch (err) {
       setForgotError(err.message || "Failed to fetch security questions.");
@@ -59,12 +73,37 @@ function AdminLogin() {
     }
   };
 
-  const handleForgotSubmit = async (e) => {
+  // Step 2: Submit Secret Answer to get Reset Token
+  const handleVerifyAnswer = async (e) => {
+    e.preventDefault();
+    setForgotError("");
+    if (!secretAnswer.trim()) {
+      setForgotError("Secret answer is required.");
+      return;
+    }
+    setForgotBusy(true);
+    try {
+      const response = await verifyRecoveryAnswer({
+        email: forgotEmail.trim(),
+        questionId: selectedQuestionId,
+        answer: secretAnswer.trim(),
+      });
+      setResetToken(response.resetToken);
+      setForgotStep(3);
+    } catch (err) {
+      setForgotError(err.message || "Secret answer verification failed.");
+    } finally {
+      setForgotBusy(false);
+    }
+  };
+
+  // Step 3: Submit New Password with Reset Token
+  const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
     setForgotError("");
     setForgotSuccess("");
-    if (!answer1.trim() || !newPassword || !confirmPassword) {
-      setForgotError("All fields are required.");
+    if (!newPassword || !confirmPassword) {
+      setForgotError("Both password fields are required.");
       return;
     }
     if (newPassword.length < 8) {
@@ -72,30 +111,27 @@ function AdminLogin() {
       return;
     }
     if (newPassword !== confirmPassword) {
-      setForgotError("Passwords do not match.");
+      setForgotError("New password and confirm password do not match.");
       return;
     }
     setForgotBusy(true);
     try {
-      const payload = {
-        email: forgotEmail,
-        answers: [
-          { id: forgotQuestions[0]?.id || "secret", answer: answer1 }
-        ],
+      await resetPasswordWithToken({
+        resetToken,
         newPassword,
-        confirmPassword
-      };
-      await resetPasswordQuestions(payload);
-      setForgotSuccess("Password reset successfully. You can now login with your new password.");
-      setForgotEmail("");
-      setAnswer1("");
-      setNewPassword("");
-      setConfirmPassword("");
+        confirmPassword,
+      });
+      setForgotSuccess("Password reset successfully! You can now log in with your new credentials.");
       setTimeout(() => {
         setIsForgotOpen(false);
         setForgotSuccess("");
         setForgotStep(1);
-      }, 3000);
+        setForgotEmail("");
+        setSecretAnswer("");
+        setResetToken("");
+        setNewPassword("");
+        setConfirmPassword("");
+      }, 2500);
     } catch (err) {
       setForgotError(err.message || "Failed to reset password.");
     } finally {
@@ -170,7 +206,7 @@ function AdminLogin() {
           alignItems: "center",
           zIndex: 99999,
         }}>
-          {forgotStep === 1 ? (
+          {forgotStep === 1 && (
             <form onSubmit={handleVerifyEmail} style={{
               backgroundColor: "#fff",
               padding: "36px",
@@ -181,16 +217,17 @@ function AdminLogin() {
               flexDirection: "column",
               gap: "16px"
             }}>
-              <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>🔑 Forgot Password</h2>
+              <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>🔑 Account Recovery</h2>
               <p style={{ margin: 0, color: "#475569", fontSize: "0.88rem" }}>
-                Enter your registered admin email address to load your security questions.
+                Enter your registered admin email address to start password recovery.
               </p>
               {forgotError && <p className="admin-error" style={{ margin: 0 }}>{forgotError}</p>}
               
               <label className="admin-field">
-                <span>Email Address</span>
+                <span>Admin Email Address</span>
                 <input
                   type="email"
+                  placeholder="e.g. admin@drdo.local"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
                   required
@@ -198,72 +235,148 @@ function AdminLogin() {
               </label>
 
               <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-                <button className="admin-secondary-btn" type="button" onClick={() => { setIsForgotOpen(false); setForgotError(""); setForgotSuccess(""); }} style={{ flex: 1, height: "40px" }}>
+                <button
+                  className="admin-secondary-btn"
+                  type="button"
+                  onClick={() => { setIsForgotOpen(false); setForgotError(""); setForgotSuccess(""); }}
+                  style={{ flex: 1, height: "40px" }}
+                >
                   Cancel
                 </button>
                 <button className="admin-primary-btn" type="submit" disabled={forgotBusy} style={{ flex: 1, height: "40px" }}>
-                  {forgotBusy ? "Loading..." : "Next"}
+                  {forgotBusy ? "Loading..." : "Continue"}
                 </button>
               </div>
             </form>
-          ) : (
-            <form onSubmit={handleForgotSubmit} style={{
+          )}
+
+          {forgotStep === 2 && (
+            <form onSubmit={handleVerifyAnswer} style={{
               backgroundColor: "#fff",
               padding: "36px",
               borderRadius: "16px",
-              width: "450px",
+              width: "480px",
               boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
               display: "flex",
               flexDirection: "column",
               gap: "16px"
             }}>
-              <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>🔑 Verify Answer</h2>
+              <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>🔒 Verify Secret Answer</h2>
               <p style={{ margin: 0, color: "#475569", fontSize: "0.88rem" }}>
-                Answer your secret recovery question to reset your password.
+                Answer your configured recovery question to authorize your password reset.
               </p>
               {forgotError && <p className="admin-error" style={{ margin: 0 }}>{forgotError}</p>}
-              {forgotSuccess && <p style={{ margin: 0, color: "green", fontSize: "0.9rem", fontWeight: "600" }}>{forgotSuccess}</p>}
-              
-              <label className="admin-field">
-                <span>Secret Question: {forgotQuestions[0]?.question}</span>
-                <input
-                  type="text"
-                  placeholder="Enter answer"
-                  value={answer1}
-                  onChange={(e) => setAnswer1(e.target.value)}
-                  required
-                />
-              </label>
+
+              {forgotQuestions.length > 1 ? (
+                <label className="admin-field">
+                  <span>Select Recovery Question</span>
+                  <select
+                    value={selectedQuestionId}
+                    onChange={(e) => setSelectedQuestionId(e.target.value)}
+                    style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #dbe7f4" }}
+                  >
+                    {forgotQuestions.map((q) => (
+                      <option key={q.id} value={q.id}>{q.question}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "12px 16px", borderRadius: "8px" }}>
+                  <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase" }}>Recovery Question</span>
+                  <p style={{ margin: "4px 0 0 0", color: "#0f172a", fontWeight: 600, fontSize: "0.95rem" }}>
+                    {forgotQuestions[0]?.question}
+                  </p>
+                </div>
+              )}
 
               <label className="admin-field">
-                <span>New Password</span>
+                <span>Secret Answer</span>
                 <input
                   type="password"
-                  placeholder="At least 8 characters"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                />
-              </label>
-
-              <label className="admin-field">
-                <span>Confirm Password</span>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Enter your secret answer"
+                  value={secretAnswer}
+                  onChange={(e) => setSecretAnswer(e.target.value)}
                   required
                 />
               </label>
 
               <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-                <button className="admin-secondary-btn" type="button" onClick={() => { setForgotStep(1); setForgotError(""); }} style={{ flex: 1, height: "40px" }}>
+                <button
+                  className="admin-secondary-btn"
+                  type="button"
+                  onClick={() => { setForgotStep(1); setForgotError(""); }}
+                  style={{ flex: 1, height: "40px" }}
+                >
                   Back
                 </button>
                 <button className="admin-primary-btn" type="submit" disabled={forgotBusy} style={{ flex: 1, height: "40px" }}>
-                  {forgotBusy ? "Resetting..." : "Reset Password"}
+                  {forgotBusy ? "Verifying..." : "Verify Answer"}
                 </button>
               </div>
+            </form>
+          )}
+
+          {forgotStep === 3 && (
+            <form onSubmit={handleResetPasswordSubmit} style={{
+              backgroundColor: "#fff",
+              padding: "36px",
+              borderRadius: "16px",
+              width: "460px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px"
+            }}>
+              <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--primary)" }}>🔑 Set New Password</h2>
+              <p style={{ margin: 0, color: "#475569", fontSize: "0.88rem" }}>
+                Identity verified! Create a new secure password for your account.
+              </p>
+              {forgotError && <p className="admin-error" style={{ margin: 0 }}>{forgotError}</p>}
+              {forgotSuccess && (
+                <div style={{ background: "#f0fdf4", color: "#166534", padding: "12px", borderRadius: "8px", border: "1px solid #bbf7d0", fontSize: "0.9rem", fontWeight: 600 }}>
+                  ✓ {forgotSuccess}
+                </div>
+              )}
+
+              {!forgotSuccess && (
+                <>
+                  <label className="admin-field">
+                    <span>New Password</span>
+                    <input
+                      type="password"
+                      placeholder="Minimum 8 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                  </label>
+
+                  <label className="admin-field">
+                    <span>Confirm New Password</span>
+                    <input
+                      type="password"
+                      placeholder="Re-enter new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                  </label>
+
+                  <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+                    <button
+                      className="admin-secondary-btn"
+                      type="button"
+                      onClick={() => { setIsForgotOpen(false); setForgotError(""); setForgotSuccess(""); }}
+                      style={{ flex: 1, height: "40px" }}
+                    >
+                      Cancel
+                    </button>
+                    <button className="admin-primary-btn" type="submit" disabled={forgotBusy} style={{ flex: 1, height: "40px" }}>
+                      {forgotBusy ? "Saving..." : "Reset Password"}
+                    </button>
+                  </div>
+                </>
+              )}
             </form>
           )}
         </div>
