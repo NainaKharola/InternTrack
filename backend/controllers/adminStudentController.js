@@ -400,6 +400,9 @@ async function downloadCertificates(req, res) {
     });
 
     res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${certificateFileName(student)}"`,
@@ -495,8 +498,14 @@ async function updateStudentReview(req, res) {
     if (req.body.permissionLetterDate !== undefined) student.permissionLetterDate = req.body.permissionLetterDate;
     if (req.body.internshipJoiningMonth !== undefined) student.internshipJoiningMonth = req.body.internshipJoiningMonth;
 
-    if (req.body.resignationStatus !== undefined) student.resignationStatus = req.body.resignationStatus;
-    if (req.body.resignationDate !== undefined) student.resignationDate = req.body.resignationDate;
+    if (req.body.resignationStatus !== undefined) {
+      student.resignationStatus = req.body.resignationStatus;
+      if (student.trainingManagement) student.trainingManagement.resignationStatus = req.body.resignationStatus;
+    }
+    if (req.body.resignationDate !== undefined) {
+      student.resignationDate = req.body.resignationDate ? new Date(req.body.resignationDate) : null;
+      if (student.trainingManagement) student.trainingManagement.resignationDate = student.resignationDate;
+    }
     if (req.body.paidInternshipProjectDetails !== undefined) {
       student.paidInternshipProjectDetails = {
         ...student.paidInternshipProjectDetails,
@@ -524,7 +533,9 @@ async function updateStudentReview(req, res) {
     if (req.body.trainingManagement !== undefined) {
       student.trainingManagement = {
         ...student.trainingManagement,
-        ...req.body.trainingManagement
+        ...req.body.trainingManagement,
+        resignationStatus: student.resignationStatus,
+        resignationDate: student.resignationDate
       };
     }
 
@@ -555,6 +566,7 @@ async function updateStudentReview(req, res) {
       student.offerLetter.collegeLocation = student.location;
       student.offerLetter.internshipDuration = student.internshipDuration;
       student.offerLetter.collegeAddress = student.collegeAddress;
+      delete student.offerLetter.html;
     }
 
     await student.save();
@@ -712,16 +724,17 @@ async function saveTrainingManagement(req, res) {
     if (isPaidInternship && req.body.trainingDuration !== undefined && req.body.trainingDuration !== "" && !paidTrainingDuration) {
       return res.status(400).json({ success: false, message: "Enter a whole number of months for a paid internship." });
     }
-    const resignationStatus = isPaidInternship && req.body.resignationStatus === "Yes" ? "Yes" : "No";
+    const resignationStatus = req.body.resignationStatus === "Yes" ? "Yes" : (req.body.resignationStatus === "No" ? "No" : (student.resignationStatus || "No"));
     const resignationDateValue = String(req.body.resignationDate || "").trim();
-    if (isPaidInternship && resignationStatus === "Yes") {
-      const parsedDate = new Date(`${resignationDateValue}T12:00:00`);
-      const validDate = /^\d{4}-\d{2}-\d{2}$/.test(resignationDateValue) &&
-        !Number.isNaN(parsedDate.getTime()) &&
-        parsedDate.toISOString().slice(0, 10) === resignationDateValue;
-      if (!validDate) {
-        return res.status(400).json({ success: false, message: "Resignation date is required when resignation is Yes." });
+    let parsedResignationDate = null;
+    if (resignationStatus === "Yes" && resignationDateValue) {
+      const parsedDate = new Date(resignationDateValue.includes("T") ? resignationDateValue : `${resignationDateValue}T12:00:00`);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        parsedResignationDate = parsedDate;
       }
+    }
+    if (resignationStatus === "Yes" && !parsedResignationDate && !student.resignationDate) {
+      return res.status(400).json({ success: false, message: "Resignation date is required when resignation is Yes." });
     }
 
     const training = {
@@ -771,6 +784,8 @@ async function saveTrainingManagement(req, res) {
 
     student.collegeName = training.collegeName;
     student.location = training.collegeLocation;
+    student.collegeLocation = training.collegeLocation;
+    student.collegeAddress = training.collegeLocation || student.collegeAddress;
 
     student.internshipDuration = training.trainingDuration;
 
@@ -785,17 +800,20 @@ async function saveTrainingManagement(req, res) {
 
       student.offerLetter.collegeName = training.collegeName;
       student.offerLetter.collegeLocation = training.collegeLocation;
+      student.offerLetter.collegeAddress = training.collegeLocation || student.offerLetter.collegeAddress;
 
       student.offerLetter.internshipDuration = training.trainingDuration;
+      // Invalidate cached offerLetter HTML so fresh documents use new data
+      delete student.offerLetter.html;
     }
     student.joinedStatus = training.joined;
     student.joinedDate = training.joinedDate || undefined;
     student.completedStatus = training.completed;
     student.completedDate = training.completionDate || undefined;
-    if (isPaidInternship) {
-      student.resignationStatus = resignationStatus;
-      student.resignationDate = resignationStatus === "Yes" ? new Date(`${resignationDateValue}T12:00:00`) : null;
-    }
+    student.resignationStatus = resignationStatus;
+    student.resignationDate = resignationStatus === "Yes" ? (parsedResignationDate || student.resignationDate || null) : null;
+    training.resignationStatus = student.resignationStatus;
+    training.resignationDate = student.resignationDate;
 
     await student.save();
 
@@ -1085,8 +1103,14 @@ async function updateStudentDetails(req, res) {
     if (body.permissionLetterDate !== undefined) student.permissionLetterDate = body.permissionLetterDate;
     if (body.internshipJoiningMonth !== undefined) student.internshipJoiningMonth = body.internshipJoiningMonth;
 
-    if (body.resignationStatus !== undefined) student.resignationStatus = body.resignationStatus;
-    if (body.resignationDate !== undefined) student.resignationDate = body.resignationDate;
+    if (body.resignationStatus !== undefined) {
+      student.resignationStatus = body.resignationStatus;
+      if (student.trainingManagement) student.trainingManagement.resignationStatus = body.resignationStatus;
+    }
+    if (body.resignationDate !== undefined) {
+      student.resignationDate = body.resignationDate ? new Date(body.resignationDate) : null;
+      if (student.trainingManagement) student.trainingManagement.resignationDate = student.resignationDate;
+    }
     if (body.paidInternshipProjectDetails !== undefined) {
       student.paidInternshipProjectDetails = {
         ...student.paidInternshipProjectDetails,
@@ -1114,7 +1138,9 @@ async function updateStudentDetails(req, res) {
     if (body.trainingManagement !== undefined) {
       student.trainingManagement = {
         ...student.trainingManagement,
-        ...body.trainingManagement
+        ...body.trainingManagement,
+        resignationStatus: student.resignationStatus,
+        resignationDate: student.resignationDate
       };
     }
 
@@ -1156,6 +1182,7 @@ async function updateStudentDetails(req, res) {
       student.offerLetter.collegeLocation = student.location;
       student.offerLetter.internshipDuration = student.internshipDuration;
       student.offerLetter.collegeAddress = student.collegeAddress;
+      delete student.offerLetter.html;
     }
 
     await student.save();

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchAdministration, fetchAdminStudents } from "../services/adminService";
 import { printPdf } from "../services/documentFileService";
+import { normalizeBranch } from "../data/branches";
 import "../styles/admin.css";
 
 const REPORT_COLUMNS = [
@@ -25,13 +26,31 @@ function dateValue(value) {
 
 function reportValue(student, key, index) {
   const training = student.trainingManagement || {};
+  const rawBranch =
+    training.branch ||
+    student.branch ||
+    student.discipline ||
+    student.department ||
+    student.specialization ||
+    "";
+  const branchVal = normalizeBranch(rawBranch) || rawBranch || "-";
+
   const values = {
-    serial: index + 1, name: student.name, course: training.courseName || student.course,
-    branch: training.branch || student.branch, division: training.division || student.division || "-", year: training.courseYear || student.year, cgpa: student.cgpa,
-    college: training.collegeName || student.collegeName, location: training.collegeLocation || student.location,
-    joinedDate: formatDate(training.joinedDate), endDate: formatDate(training.toDate),
-    duration: training.trainingDuration || student.internshipDuration, projectTitle: training.projectTitle,
-    projectGuide: training.projectGuide, designation: training.designation,
+    serial: index + 1,
+    name: training.studentName || student.name || "-",
+    course: training.courseName || student.course || "-",
+    branch: branchVal,
+    division: training.division || student.division || "-",
+    year: training.courseYear || student.year || "-",
+    cgpa: student.cgpa || "-",
+    college: training.collegeName || student.collegeName || "-",
+    location: training.collegeLocation || student.location || student.collegeLocation || student.collegeAddress || "-",
+    joinedDate: formatDate(training.joinedDate || training.fromDate),
+    endDate: formatDate(training.toDate),
+    duration: training.trainingDuration || student.internshipDuration || "-",
+    projectTitle: training.projectTitle || "-",
+    projectGuide: training.projectGuide || "-",
+    designation: training.designation || "-",
   };
   return values[key] || "-";
 }

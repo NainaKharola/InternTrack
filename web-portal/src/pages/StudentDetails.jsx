@@ -203,31 +203,62 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
       divisions.forEach((div) => {
         const config = administration.divisionConfigurations?.[div];
         const isPaidStudent = (student.internshipType || "Unpaid").toLowerCase() === "paid";
-        const paidVacancy = (config?.allowedBranches || []).reduce((sum, b) => sum + Math.max(0, Number(config?.branchSeats?.[b]?.paid) || 0), 0);
-        const unpaidVacancy = (config?.allowedBranches || []).reduce((sum, b) => sum + Math.max(0, Number(config?.branchSeats?.[b]?.unpaid ?? config?.branchSeats?.[b]) || 0), 0);
-        const totalVacancy = paidVacancy + unpaidVacancy;
-        
+        const normalizedBranch = normalizeBranch(branch) || branch;
+
+        let branchSeatObj = config?.branchSeats?.[normalizedBranch];
+        if (branchSeatObj === undefined && config?.branchSeats) {
+          for (const [key, value] of Object.entries(config.branchSeats)) {
+            if (key.toLowerCase() === normalizedBranch.toLowerCase() || normalizeBranch(key).toLowerCase() === normalizedBranch.toLowerCase()) {
+              branchSeatObj = value;
+              break;
+            }
+          }
+        }
+
+        const allowedBranches = config?.allowedBranches || [];
+        const acceptsBranch = allowedBranches.some(b => b.toLowerCase() === normalizedBranch.toLowerCase() || normalizeBranch(b).toLowerCase() === normalizedBranch.toLowerCase()) || branchSeatObj !== undefined;
+
+        let paidVacancy = 0;
+        let unpaidVacancy = 0;
+        allowedBranches.forEach((b) => {
+          const bs = config?.branchSeats?.[b];
+          if (bs && typeof bs === "object") {
+            paidVacancy += Math.max(0, Number(bs.paid) || 0);
+            unpaidVacancy += Math.max(0, Number(bs.unpaid) || 0);
+          } else {
+            unpaidVacancy += Math.max(0, Number(bs) || 0);
+          }
+        });
+
+        const totalVacancy = paidVacancy + unpaidVacancy || Math.max(0, Number(config?.totalVacancy) || 0);
+        const typeCapacity = isPaidStudent ? (paidVacancy > 0 ? paidVacancy : totalVacancy) : (unpaidVacancy > 0 ? unpaidVacancy : totalVacancy);
+
+        let branchCapacity = 0;
+        if (branchSeatObj && typeof branchSeatObj === "object") {
+          const p = Number(branchSeatObj.paid) || 0;
+          const u = Number(branchSeatObj.unpaid) || 0;
+          branchCapacity = isPaidStudent ? (p > 0 ? p : u) : (u > 0 ? u : p);
+        } else if (branchSeatObj !== undefined) {
+          branchCapacity = Number(branchSeatObj) || 0;
+        } else if (acceptsBranch) {
+          branchCapacity = totalVacancy || 10;
+        }
+
         const activeStudents = students.filter(s =>
           s.status === "Approved" &&
           s.trainingManagement?.division === div &&
           s.trainingManagement?.completed !== "Yes" &&
-          (s.internshipType || "Unpaid").toLowerCase() === (student.internshipType || "Unpaid").toLowerCase() &&
           s._id !== student._id
         );
-        
-        const branchSeatObj = config?.branchSeats?.[branch];
-        let branchCapacity = 0;
-        if (branchSeatObj && typeof branchSeatObj === "object") {
-          branchCapacity = isPaidStudent ? (Number(branchSeatObj.paid) || 0) : (Number(branchSeatObj.unpaid) || 0);
-        } else {
-          branchCapacity = isPaidStudent ? 0 : (Number(branchSeatObj) || 0);
-        }
-        
-        const allocatedForBranch = activeStudents.filter((assignedStudent) => assignedStudent.branch === branch).length;
-        const typeCapacity = isPaidStudent ? paidVacancy : unpaidVacancy;
+
+        const allocatedForBranch = activeStudents.filter((assignedStudent) => {
+          const sBranch = normalizeBranch(assignedStudent.trainingManagement?.branch || assignedStudent.branch || assignedStudent.discipline || assignedStudent.department || "") || assignedStudent.branch || "";
+          return sBranch.toLowerCase() === normalizedBranch.toLowerCase();
+        }).length;
+
         const availableSeats = Math.max(0, typeCapacity - activeStudents.length);
         const branchAvailableSeats = Math.max(0, branchCapacity - allocatedForBranch);
-        const acceptsBranch = Boolean(branch && config?.allowedBranches?.includes(branch) && branchCapacity > 0);
+
         stats[div] = {
           isFull: typeCapacity > 0 && availableSeats === 0,
           isBranchFull: !acceptsBranch || branchAvailableSeats === 0,
@@ -314,7 +345,7 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
         return;
       }
     }
-    if (student.internshipType === "Paid" && payload.resignationStatus === "Yes" && !payload.resignationDate) {
+    if (payload.resignationStatus === "Yes" && !payload.resignationDate) {
       setMessage("Please enter a resignation date when resignation is Yes.");
       return;
     }
@@ -597,16 +628,14 @@ function TrainingManagementForm({ student, divisions, onUpdated, alwaysOpen = fa
             </label>
           ))}
 
-          {student.internshipType === "Paid" && (
-            <label className="admin-field">
-              <span>Resignation</span>
-              <select name="resignationStatus" value={form.resignationStatus} onChange={handleChange}>
-                <option value="No">No</option>
-                <option value="Yes">Yes</option>
-              </select>
-            </label>
-          )}
-          {student.internshipType === "Paid" && form.resignationStatus === "Yes" && (
+          <label className="admin-field">
+            <span>Resignation</span>
+            <select name="resignationStatus" value={form.resignationStatus} onChange={handleChange}>
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </label>
+          {form.resignationStatus === "Yes" && (
             <label className="admin-field">
               <span>Resignation Date</span>
               <input type="date" name="resignationDate" value={form.resignationDate} onChange={handleChange} required />

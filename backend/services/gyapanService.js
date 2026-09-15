@@ -42,8 +42,9 @@ function studentToRow(student) {
     branch: training.branch || training.department || student.branch || student.department || "",
     division: training.division || "",
     collegeName: training.collegeName || student.collegeName || "",
-    collegeLocation: training.collegeLocation || student.location || "",
-    collegeAddress: training.collegeAddress || student.collegeAddress || "",
+    collegeLocation: training.collegeLocation || student.location || student.collegeLocation || student.collegeAddress || "",
+    collegeAddress: training.collegeAddress || student.collegeAddress || training.collegeLocation || student.location || "",
+    duration: "6 months",
     trainingStartDate: training.fromDate || "",
     trainingEndDate: training.toDate || "",
   };
@@ -52,6 +53,7 @@ function studentToRow(student) {
 function buildStudentRows(rows) {
   return rows
     .map((row) => {
+      const durationVal = row.duration || "6 months";
       return `
         <tr>
           <td>
@@ -69,7 +71,7 @@ function buildStudentRows(rows) {
           </td>
 
           <td>
-            ${escapeHtml(formatDate(row.trainingStartDate))} - ${escapeHtml(formatDate(row.trainingEndDate))}
+            ${escapeHtml(durationVal)}
           </td>
         </tr>
       `;

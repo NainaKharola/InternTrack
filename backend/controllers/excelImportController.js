@@ -195,7 +195,7 @@ async function importApprovedStudentsExcel(req, res) {
     await logActivity({ req, module: "Student Module", action: "Imported Student Excel", description: `Imported basic information and CGPA for ${matches.length} approved student(s).`, status: "Success" });
     return res.json({ success: true, message: `Imported ${matches.length} approved student record(s).`, totalRows: matches.length, updated: matches.length, notFound: [], invalidRows: [] });
   } catch {
-    await client.query("ROLLBACK").catch(() => {});
+    await client.query("ROLLBACK").catch(() => { });
     return res.status(500).json({ success: false, message: "Excel import failed. No student records were changed." });
   } finally {
     client.release();
@@ -347,7 +347,7 @@ async function importStudentsExcel(req, res) {
     });
     return res.json({ success: true, message: errors.length ? `Import completed with ${errors.length} error(s).` : "Student import completed successfully.", summary, errors });
   } catch {
-    await client.query("ROLLBACK").catch(() => {});
+    await client.query("ROLLBACK").catch(() => { });
     return res.status(500).json({ success: false, message: "Excel import failed. No student records were changed." });
   } finally {
     client.release();

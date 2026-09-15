@@ -193,25 +193,26 @@ function formatDate(value) {
 }
 
 function buildStudentTemplateData(student) {
+  const training = student.trainingManagement || {};
   return {
-    studentName: student.name,
-    fatherName: student.fatherName,
-    parentOccupation: student.fatherOccupation,
-    temporaryAddress: student.currentAddress,
-    permanentAddress: student.permanentAddress,
-    collegeName: student.collegeName,
-    collegeLocation: student.location,
-    course: student.course,
-    year: student.year,
-    branch: student.branch,
-    mobileNumber: student.phone,
-    residencePhone: student.fatherPhone,
-    email: student.email,
+    studentName: training.studentName || student.name || "",
+    fatherName: student.fatherName || "",
+    parentOccupation: student.fatherOccupation || "",
+    temporaryAddress: student.currentAddress || "",
+    permanentAddress: student.permanentAddress || "",
+    collegeName: training.collegeName || student.collegeName || "",
+    collegeLocation: training.collegeLocation || student.location || student.collegeLocation || student.collegeAddress || "",
+    course: training.courseName || student.course || "",
+    year: training.courseYear || student.year || "",
+    branch: training.branch || student.branch || "",
+    mobileNumber: student.phone || "",
+    residencePhone: student.fatherPhone || "",
+    email: student.email || "",
     dateOfBirth: formatDate(student.dob),
     nationality: "Indian",
-    collegeIdNumber: student.collegeId,
-    issueDate: "",
-    place: "",
+    collegeIdNumber: student.collegeId || "",
+    issueDate: formatDate(new Date()),
+    place: "Dehradun",
     sponsoringAuthorityName: "",
     sponsoringAuthorityDesignation: "",
     policePlace: "",
@@ -616,6 +617,9 @@ async function downloadStudentDocument(req, res) {
         : "DRDO-Character-Certificate.pdf";
 
     res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
     return res.send(pdf);
   } 

@@ -173,7 +173,17 @@ async function importStudentsFromExcel(buffer, options = {}) {
       const val = normalizeHeader(cell.value);
       if (!val) return;
 
-      if (val.includes("referenceid") || val.includes("applicationid") || val.includes("appid") || val === "refid" || (val.includes("id") && !val.includes("email") && !val.includes("guide") && !val.includes("college") && !val.includes("branch"))) {
+      if (
+        val.includes("referenceid") ||
+        val.includes("applicationid") ||
+        val.includes("application_id") ||
+        val.includes("reference_id") ||
+        val.includes("appid") ||
+        val === "refid" ||
+        val === "id" ||
+        val === "application" ||
+        (val.includes("id") && !val.includes("email") && !val.includes("guide") && !val.includes("college") && !val.includes("branch") && !val.includes("paid"))
+      ) {
         candidateMap.referenceId = colNumber;
       } else if (val.includes("collegelocation") || val.includes("collegeaddress") || (val.includes("location") && !val.includes("name")) || val === "address" || val.includes("city")) {
         candidateMap.collegeLocation = colNumber;
@@ -212,12 +222,16 @@ async function importStudentsFromExcel(buffer, options = {}) {
         candidateMap.serialNumber = colNumber;
       } else if (val === "status" || (val.includes("status") && !val.includes("resignation") && !val.includes("joined") && !val.includes("completed") && !val.includes("offer"))) {
         candidateMap.status = colNumber;
-      } else if (val.includes("internshiptype") || val === "type") {
+      } else if (val.includes("internshiptype") || val.includes("interntype") || val === "type" || val.includes("category") || val.includes("paidstatus") || val.includes("payment")) {
         candidateMap.internshipType = colNumber;
       } else if (val.includes("fromdate") || val.includes("joiningdate") || val.includes("startdate")) {
         candidateMap.fromDate = colNumber;
       } else if (val.includes("todate") || val.includes("completiondate") || val.includes("enddate")) {
         candidateMap.toDate = colNumber;
+      } else if (val.includes("resignationdate") || val.includes("resigndate") || (val.includes("resignation") && val.includes("date"))) {
+        candidateMap.resignationDate = colNumber;
+      } else if (val.includes("resignation") || val.includes("resigned")) {
+        candidateMap.resignationStatus = colNumber;
       }
     });
 
@@ -265,13 +279,17 @@ async function importStudentsFromExcel(buffer, options = {}) {
         continue;
       }
 
-      // Search for existing student primarily by referenceId, then by email
+      // Search for existing student STRICTLY by referenceId (Application ID) in the Students table.
+      // An existing Application or matching email must NEVER cause the student to be classified as existing.
       let existingStudent = null;
       if (referenceId) {
-        existingStudent = await Student.findOne({ referenceId });
-      }
-      if (!existingStudent && email) {
-        existingStudent = await Student.findOne({ email });
+        existingStudent = await Student.findOne({
+          $or: [
+            { referenceId: referenceId },
+            { referenceId: referenceId.toLowerCase() },
+            { referenceId: referenceId.toUpperCase() }
+          ]
+        });
       }
 
       // Resolve branch: check branch cell first, then course extraction, then branchCode
@@ -312,6 +330,7 @@ async function importStudentsFromExcel(buffer, options = {}) {
         }
         if (isNonEmptyValue(rowValues.collegeLocation)) {
           updates.location = rowValues.collegeLocation;
+          updates.collegeLocation = rowValues.collegeLocation;
           updates.collegeAddress = rowValues.collegeLocation;
           newTraining.collegeLocation = rowValues.collegeLocation;
           trainingUpdated = true;
@@ -350,8 +369,11 @@ async function importStudentsFromExcel(buffer, options = {}) {
           }
         }
         if (isNonEmptyValue(rowValues.internshipType)) {
-          const formattedType = rowValues.internshipType.toLowerCase().includes("paid") ? "Paid" : "Unpaid";
+          const typeLower = rowValues.internshipType.toLowerCase();
+          const formattedType = typeLower.includes("unpaid") ? "Unpaid" : (typeLower.includes("paid") ? "Paid" : "Paid");
           updates.internshipType = formattedType;
+        } else if (options.defaultInternshipType || options.internshipType) {
+          updates.internshipType = options.defaultInternshipType || options.internshipType;
         }
 
         if (isNonEmptyValue(rowValues.division)) {
@@ -368,6 +390,19 @@ async function importStudentsFromExcel(buffer, options = {}) {
         }
         if (isNonEmptyValue(rowValues.toDate)) {
           newTraining.toDate = rowValues.toDate;
+          trainingUpdated = true;
+        }
+
+        if (isNonEmptyValue(rowValues.resignationDate)) {
+          updates.resignationDate = new Date(rowValues.resignationDate);
+          updates.resignationStatus = "Yes";
+          newTraining.resignationDate = updates.resignationDate;
+          newTraining.resignationStatus = "Yes";
+          trainingUpdated = true;
+        } else if (isNonEmptyValue(rowValues.resignationStatus)) {
+          const isRes = String(rowValues.resignationStatus).toLowerCase().includes("y");
+          updates.resignationStatus = isRes ? "Yes" : "No";
+          newTraining.resignationStatus = updates.resignationStatus;
           trainingUpdated = true;
         }
 
@@ -388,6 +423,17 @@ async function importStudentsFromExcel(buffer, options = {}) {
           ? (["Approved", "Pending", "Rejected"].includes(rowValues.status) ? rowValues.status : "Approved")
           : (options.defaultStatus || "Approved");
 
+        const fallbackInternshipType = options.defaultInternshipType || options.internshipType || "Paid";
+        let resolvedInternshipType = fallbackInternshipType;
+        if (isNonEmptyValue(rowValues.internshipType)) {
+          const typeLower = rowValues.internshipType.toLowerCase();
+          if (typeLower.includes("unpaid")) {
+            resolvedInternshipType = "Unpaid";
+          } else if (typeLower.includes("paid")) {
+            resolvedInternshipType = "Paid";
+          }
+        }
+
         const studentName = isNonEmptyValue(rowValues.name) ? rowValues.name : "Student";
         const course = isNonEmptyValue(rowValues.course) ? rowValues.course : "B.Tech";
         const branch = resolvedBranch || "Computer Science and Engineering";
@@ -395,6 +441,15 @@ async function importStudentsFromExcel(buffer, options = {}) {
         const collegeName = isNonEmptyValue(rowValues.collegeName) ? rowValues.collegeName : "";
         const collegeLocation = isNonEmptyValue(rowValues.collegeLocation) ? rowValues.collegeLocation : "";
         const duration = isNonEmptyValue(rowValues.duration) ? rowValues.duration : "4 Weeks";
+
+        let newResignationStatus = "No";
+        let newResignationDate = null;
+        if (isNonEmptyValue(rowValues.resignationDate)) {
+          newResignationStatus = "Yes";
+          newResignationDate = new Date(rowValues.resignationDate);
+        } else if (isNonEmptyValue(rowValues.resignationStatus)) {
+          newResignationStatus = String(rowValues.resignationStatus).toLowerCase().includes("y") ? "Yes" : "No";
+        }
 
         const newStudentData = {
           referenceId: newRefId,
@@ -406,13 +461,16 @@ async function importStudentsFromExcel(buffer, options = {}) {
           cgpa: isNonEmptyValue(rowValues.cgpa) ? rowValues.cgpa : "",
           collegeName: collegeName,
           location: collegeLocation,
+          collegeLocation: collegeLocation,
           collegeAddress: collegeLocation,
           branch: branch,
           course: course,
           year: year,
           internshipDuration: duration,
           status: initialStatus,
-          internshipType: isNonEmptyValue(rowValues.internshipType) && rowValues.internshipType.toLowerCase().includes("paid") ? "Paid" : "Unpaid",
+          internshipType: resolvedInternshipType,
+          resignationStatus: newResignationStatus,
+          resignationDate: newResignationDate,
           submittedAt: new Date().toISOString(),
           approvedDate: initialStatus === "Approved" ? new Date().toISOString().slice(0, 10) : null,
           trainingManagement: {
@@ -427,7 +485,9 @@ async function importStudentsFromExcel(buffer, options = {}) {
             seatNumber: isNonEmptyValue(rowValues.seatNumber) ? rowValues.seatNumber : "",
             fromDate: isNonEmptyValue(rowValues.fromDate) ? rowValues.fromDate : "",
             toDate: isNonEmptyValue(rowValues.toDate) ? rowValues.toDate : "",
-          },
+            resignationStatus: newResignationStatus,
+            resignationDate: newResignationDate,
+          }
         };
 
         await Student.create(newStudentData);

@@ -9,7 +9,7 @@ module.exports = createPostgresModel("students.json", {
   gyapanBufferRemoved: false,
   aadhaarCard: null,
   collegeAddress: "",
-  internshipType: "Unpaid",
+  internshipType: "Paid",
   gender: "",
   // These fields are deliberately separate from training management so only
   // the approved paid-internship student can maintain their project details.

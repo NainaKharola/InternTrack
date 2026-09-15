@@ -1,17 +1,28 @@
+import { normalizeBranch } from "../data/branches.js";
+
 export function getAllocatedStudents(students, divisions) {
   const divisionSet = new Set(divisions);
-  return students.filter((student) => student.status === "Approved" && divisionSet.has(student.trainingManagement?.division));
+  return (students || []).filter((student) => student.status === "Approved" && divisionSet.has(student.trainingManagement?.division));
 }
 
 const nonNegativeNumber = (value) => Math.max(0, Number(value) || 0);
 
 export function getBranchSeatCapacity(configuration, branch) {
-  const configuredSeats = configuration?.branchSeats?.[branch];
+  const targetBranch = normalizeBranch(branch) || branch;
+  let configuredSeats = configuration?.branchSeats?.[targetBranch];
+  if (configuredSeats === undefined && configuration?.branchSeats) {
+    for (const [key, value] of Object.entries(configuration.branchSeats)) {
+      if (key.toLowerCase() === targetBranch.toLowerCase() || normalizeBranch(key).toLowerCase() === targetBranch.toLowerCase()) {
+        configuredSeats = value;
+        break;
+      }
+    }
+  }
   if (configuredSeats && typeof configuredSeats === "object") {
     return nonNegativeNumber(configuredSeats.paid) + nonNegativeNumber(configuredSeats.unpaid);
   }
   if (Number.isFinite(Number(configuredSeats))) return nonNegativeNumber(configuredSeats);
-  return configuration?.allowedBranches?.includes(branch) ? nonNegativeNumber(configuration.totalVacancy) : 0;
+  return configuration?.allowedBranches?.includes(targetBranch) ? nonNegativeNumber(configuration.totalVacancy) : 0;
 }
 
 export function calculateTotalVacancy(configuration) {
@@ -46,53 +57,78 @@ export function getAllocatedStudentCount(students, division, divisions) {
 }
 
 export function getBranchDivisionRecommendations(divisions, configurations, students, branch, student) {
+  const targetBranch = normalizeBranch(branch || student?.trainingManagement?.branch || student?.branch || student?.discipline || student?.department || "") || branch || "";
   const normalizedType = student?.internshipType === "Paid" ? "Paid" : "Unpaid";
-  const typeKey = normalizedType.toLowerCase();
+  const isPaidStudent = normalizedType === "Paid";
 
-  const rows = divisions.map((division) => {
+  const rows = (divisions || []).map((division) => {
     const config = configurations?.[division];
-    const seats = config?.branchSeats?.[branch];
-    let configuredSeats = 0;
-    if (seats && typeof seats === "object") {
-      configuredSeats = nonNegativeNumber(seats[typeKey]);
-    } else {
-      configuredSeats = normalizedType === "Unpaid" ? nonNegativeNumber(seats) : 0;
+    const allowedBranches = config?.allowedBranches || [];
+    
+    // Find matching branch seats
+    let seats = config?.branchSeats?.[targetBranch];
+    if (seats === undefined && config?.branchSeats) {
+      for (const [key, value] of Object.entries(config.branchSeats)) {
+        if (key.toLowerCase() === targetBranch.toLowerCase() || normalizeBranch(key).toLowerCase() === targetBranch.toLowerCase()) {
+          seats = value;
+          break;
+        }
+      }
     }
 
-    const allocatedStudents = getAllocatedStudents(students, divisions).filter((s) => (
-      s.trainingManagement?.division === division && s.branch === branch && (s.internshipType || "Unpaid") === normalizedType
-    )).length;
+    const acceptsBranch = allowedBranches.some(b => b.toLowerCase() === targetBranch.toLowerCase() || normalizeBranch(b).toLowerCase() === targetBranch.toLowerCase()) || seats !== undefined;
 
-    let divisionCapacity = 0;
-    (config?.allowedBranches || []).forEach((b) => {
-      const bs = config?.branchSeats?.[b];
-      if (bs && typeof bs === "object") {
-        divisionCapacity += nonNegativeNumber(bs[typeKey]);
-      } else {
-        divisionCapacity += normalizedType === "Unpaid" ? nonNegativeNumber(bs) : 0;
-      }
+    let paidConfiguredSeats = 0;
+    let unpaidConfiguredSeats = 0;
+
+    if (seats && typeof seats === "object") {
+      paidConfiguredSeats = nonNegativeNumber(seats.paid);
+      unpaidConfiguredSeats = nonNegativeNumber(seats.unpaid);
+    } else if (typeof seats === "number" || (typeof seats === "string" && seats !== "")) {
+      unpaidConfiguredSeats = nonNegativeNumber(seats);
+    } else if (acceptsBranch) {
+      paidConfiguredSeats = nonNegativeNumber(config?.paidSeats || 0);
+      unpaidConfiguredSeats = nonNegativeNumber(config?.unpaidSeats || config?.totalVacancy || 0);
+    }
+
+    const totalConfigured = paidConfiguredSeats + unpaidConfiguredSeats;
+
+    // Allocated students
+    const allocated = getAllocatedStudents(students, divisions);
+    const branchAllocated = allocated.filter((s) => {
+      const sBranch = normalizeBranch(s.trainingManagement?.branch || s.branch || s.discipline || s.department || "") || s.branch || "";
+      return s.trainingManagement?.division === division && sBranch.toLowerCase() === targetBranch.toLowerCase();
     });
 
-    const divisionAllocated = getAllocatedStudents(students, divisions).filter((s) => (
-      s.trainingManagement?.division === division && (s.internshipType || "Unpaid") === normalizedType
-    )).length;
+    const paidAllocated = branchAllocated.filter(s => s.internshipType === "Paid").length;
+    const unpaidAllocated = branchAllocated.filter(s => (s.internshipType || "Unpaid") !== "Paid").length;
+    const totalAllocated = paidAllocated + unpaidAllocated;
 
-    const availableSeats = Math.min(
-      calculateAvailableSeats(configuredSeats, allocatedStudents),
-      calculateAvailableSeats(divisionCapacity, divisionAllocated),
-    );
-    const isNull = configuredSeats === 0;
+    const availablePaidSeats = Math.max(0, paidConfiguredSeats - paidAllocated);
+    const availableUnpaidSeats = Math.max(0, unpaidConfiguredSeats - unpaidAllocated);
+
+    const relevantConfigured = isPaidStudent ? paidConfiguredSeats : (unpaidConfiguredSeats > 0 ? unpaidConfiguredSeats : totalConfigured);
+    const relevantAllocated = isPaidStudent ? paidAllocated : unpaidAllocated;
+    const relevantAvailable = isPaidStudent ? availablePaidSeats : (unpaidConfiguredSeats > 0 ? availableUnpaidSeats : (availablePaidSeats + availableUnpaidSeats));
+
+    const isNull = totalConfigured === 0 && !acceptsBranch;
+
     return {
       division,
-      configuredSeats,
-      allocatedStudents,
-      availableSeats,
-      utilization: calculateUtilization(allocatedStudents, configuredSeats),
-      isNull
+      configuredSeats: relevantConfigured,
+      allocatedStudents: relevantAllocated,
+      availableSeats: relevantAvailable,
+      availablePaidSeats,
+      availableUnpaidSeats,
+      utilization: calculateUtilization(totalAllocated, totalConfigured || 1),
+      isNull,
+      acceptsBranch,
+      totalConfigured
     };
   });
 
-  const filteredRows = rows.filter((row) => row.configuredSeats > 0);
+  // Filter divisions: include any division that accepts the branch or has configured seats for this branch
+  const filteredRows = rows.filter((row) => row.acceptsBranch || row.totalConfigured > 0);
 
   return filteredRows.sort((left, right) => {
     if (left.availableSeats !== right.availableSeats) {
@@ -105,23 +141,30 @@ export function getBranchDivisionRecommendations(divisions, configurations, stud
 export function getDivisionAllocationRows(divisions, configurations, students) {
   const allocated = getAllocatedStudents(students, divisions);
   const allocations = allocated.reduce((counts, student) => ({ ...counts, [student.trainingManagement?.division]: (counts[student.trainingManagement?.division] || 0) + 1 }), {});
-  return sortRecommendations(divisions.map((division) => {
+  return sortRecommendations((divisions || []).map((division) => {
     const allocatedStudents = allocations[division] || 0;
     const totalVacancy = calculateTotalVacancy(configurations?.[division]);
     const availableSeats = calculateAvailableSeats(totalVacancy, allocatedStudents);
-    return { division, totalVacancy, allocatedStudents, availableSeats, utilization: calculateUtilization(allocatedStudents, totalVacancy), isFull: totalVacancy > 0 && availableSeats === 0, isUnconfigured: totalVacancy === 0 && allocatedStudents === 0 };
+    return {
+      division,
+      totalVacancy,
+      allocatedStudents,
+      availableSeats,
+      utilization: calculateUtilization(allocatedStudents, totalVacancy),
+      isFull: totalVacancy > 0 && availableSeats === 0,
+      isUnconfigured: totalVacancy === 0 && allocatedStudents === 0
+    };
   }));
 }
 
 export function getGeneralDivisionRecommendations(divisions, configurations, students) {
   const allocated = getAllocatedStudents(students, divisions);
 
-  const rows = divisions.map((division) => {
+  const rows = (divisions || []).map((division) => {
     const configuration = configurations?.[division];
     const typeCapacity = (typeKey) => (configuration?.allowedBranches || []).reduce((total, branch) => {
       const seats = configuration?.branchSeats?.[branch];
       if (seats && typeof seats === "object") return total + nonNegativeNumber(seats[typeKey]);
-      // Numeric legacy branch seats represented unpaid capacity.
       return total + (typeKey === "unpaid" ? nonNegativeNumber(seats) : 0);
     }, 0);
     const paidConfiguredSeats = typeCapacity("paid");

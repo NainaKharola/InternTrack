@@ -153,6 +153,10 @@ async function getOfferLetterPreview(req, res) {
       html = await generateOfferLetterHtml(student);
     }
 
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
     return res.status(200).json({
       success: true,
       student: serializeStudent(student),
@@ -281,8 +285,9 @@ async function updateOfferLetter(req, res) {
 async function generateOfferLetterPdf(req, res) {
   try {
     const student = await findApprovedStudent(req.params.studentId);
-    const html =
-      student.offerLetter?.html || (await generateOfferLetterHtml(student));
+    
+    // Always render fresh HTML using the latest student data from database
+    const html = await generateOfferLetterHtml(student);
     const pdfBuffer = await generatePdfFromHtml(html);
 
     student.offerLetter = {
@@ -308,6 +313,9 @@ async function generateOfferLetterPdf(req, res) {
     });
 
     res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.setHeader(
       "Content-Disposition",
       'attachment; filename="DRDO-Internship-Offer-Letter.pdf"',
@@ -387,8 +395,8 @@ async function sendOfferLetter(req, res) {
         url: student.offerLetter.url,
       });
     } else {
-      const html =
-        student.offerLetter?.html || (await generateOfferLetterHtml(student));
+      // Always render fresh HTML from current student database data
+      const html = await generateOfferLetterHtml(student);
       pdfBuffer = await generatePdfFromHtml(html);
 
       const { uploadFile } = require("../services/s3StorageService");

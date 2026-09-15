@@ -40,9 +40,14 @@ function generateCertificateHtml(student, renderMode = "full", signatureName = "
     const toDate = formatDate(training.toDate);
     const issuedDate = formatDate(new Date());
 
-    const studentNameClass = `${(student.name || "").toUpperCase()} (${(student.course || "").toUpperCase()} ${(student.year || "").toUpperCase()}, ${(student.branch || "").toUpperCase()})`;
+    const studentName = (training.studentName || student.name || "").toUpperCase();
+    const course = (training.courseName || student.course || "").toUpperCase();
+    const year = (training.courseYear || student.year || "").toUpperCase();
+    const branch = (training.branch || student.branch || "").toUpperCase();
+    const studentNameClass = `${studentName} (${course} ${year}, ${branch})`;
+
     const instituteName = training.collegeName || student.collegeName || "";
-    const instituteLocation = training.collegeLocation || student.location || student.collegeAddress || "";
+    const instituteLocation = training.collegeLocation || student.location || student.collegeLocation || student.collegeAddress || "";
     const collegeNameAddress = `${instituteName.toUpperCase()}${instituteLocation ? `, ${instituteLocation.toUpperCase()}` : ""}`;
 
     const perf = (training.leaveAvailed || training.performance || "").trim().toLowerCase();

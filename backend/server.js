@@ -46,8 +46,21 @@ pool.query("SELECT NOW()")
       await pool.query("CREATE INDEX IF NOT EXISTS idx_students_referenceId ON students ((student_data->>'referenceId'))");
       await pool.query("CREATE INDEX IF NOT EXISTS idx_admins_email ON admins ((admin_data->>'email'))");
       console.log("✅ Database indexes ready");
+
+      await pool.query(`
+        UPDATE students 
+        SET student_data = jsonb_set(
+          COALESCE(student_data, '{}'::jsonb), 
+          '{internshipType}', 
+          '"Paid"'
+        ) 
+        WHERE student_data->>'internshipType' = 'Unpaid' 
+           OR student_data->>'internshipType' IS NULL 
+           OR student_data->>'internshipType' = ''
+      `);
+      console.log("✅ Verified and ensured existing imported student records are set to Paid");
     } catch (err) {
-      console.error("❌ Database indexing failed:", err.message);
+      console.error("❌ Database indexing or migration failed:", err.message);
     }
   })
   .catch(err => {

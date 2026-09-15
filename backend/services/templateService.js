@@ -51,68 +51,54 @@ function defaultLetterNumber(student) {
 }
 
 function buildTemplateData(student, overrides = {}) {
+  const training = student.trainingManagement || {};
+  const offer = student.offerLetter || {};
+
   const issueDate =
     overrides.issueDate ||
-    student.offerLetter?.issueDate ||
+    offer.issueDate ||
     new Date();
 
   let duration =
     overrides.internshipDuration ||
     overrides.duration ||
-    student.trainingManagement?.trainingDuration ||
-    student.offerLetter?.internshipDuration ||
+    training.trainingDuration ||
     student.internshipDuration ||
+    offer.internshipDuration ||
     "";
-  if (!duration && student.internshipType === "Paid") {
+  if (!duration && (student.internshipType === "Paid" || offer.internshipType === "Paid")) {
     duration = "6 Months";
   }
+
+  const studentName = overrides.studentName || training.studentName || student.name || offer.studentName || "";
+  const course = overrides.course || training.courseName || student.course || offer.course || "";
+  const year = overrides.year || training.courseYear || student.year || offer.year || "";
+  const branch = overrides.branch || training.branch || student.branch || offer.branch || "";
+  const collegeName = overrides.collegeName || training.collegeName || student.collegeName || offer.collegeName || "";
+  const collegeLocation = overrides.collegeLocation || training.collegeLocation || student.location || student.collegeLocation || offer.collegeLocation || "";
+  const collegeAddress = overrides.collegeAddress || training.collegeAddress || student.collegeAddress || student.location || offer.collegeAddress || collegeLocation || "";
 
   return {
     logoUrl: overrides.logoUrl || logoBase64,
     bannerUrl: bannerBase64,
     swachhUrl: overrides.swachhUrl || swachhBase64,
 
-    studentName: overrides.studentName || student.name || "",
-
-    course:
-      overrides.course ||
-      student.course ||
-      "",
-
-    year:
-      overrides.year ||
-      student.year ||
-      "",
-
-    branch:
-      overrides.branch ||
-      student.branch ||
-      "",
-
-    collegeName:
-      overrides.collegeName ||
-      student.collegeName ||
-      "",
-
-    collegeLocation:
-      overrides.collegeLocation ||
-      student.location ||
-      "",
-
-    collegeAddress:
-      overrides.collegeAddress ||
-      student.offerLetter?.collegeAddress ||
-      student.collegeAddress ||
-      "",
+    studentName,
+    course,
+    year,
+    branch,
+    collegeName,
+    collegeLocation,
+    collegeAddress,
 
     internshipDuration: duration,
-    duration: duration,
+    duration,
 
     issueDate: formatDate(issueDate),
 
     letterNumber:
       overrides.letterNumber ||
-      student.offerLetter?.letterNumber ||
+      offer.letterNumber ||
       defaultLetterNumber(student),
   };
 }

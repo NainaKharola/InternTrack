@@ -15,6 +15,30 @@ function formatExportDate(value) {
   return `${day}-${month}-${year}`;
 }
 
+const { normalizeBranch } = require("./studentImportService");
+
+function extractBranchFromCourse(courseStr) {
+  if (!courseStr || typeof courseStr !== "string") return "";
+  const matchParen = courseStr.match(/\(([^)]+)\)/);
+  if (matchParen && matchParen[1]) {
+    const extracted = normalizeBranch(matchParen[1]);
+    if (extracted) return extracted;
+  }
+  const matchDash = courseStr.match(/[-:]\s*([A-Za-z0-9\s&_]+)$/);
+  if (matchDash && matchDash[1]) {
+    const extracted = normalizeBranch(matchDash[1]);
+    if (extracted) return extracted;
+  }
+  return "";
+}
+
+function normalizeCourseName(courseStr) {
+  if (!courseStr || typeof courseStr !== "string") return "";
+  let clean = courseStr.replace(/\s*\([^)]*\)/g, "").trim();
+  clean = clean.replace(/[-:]\s*[A-Za-z0-9\s&_]+$/, "").trim();
+  return clean || courseStr;
+}
+
 /**
  * Builds and returns the standardized ExcelJS workbook for student applications.
  */
@@ -32,7 +56,7 @@ async function generateApplicationsWorkbook() {
     { header: "Name", key: "name", width: 26 },
     { header: "Reference ID", key: "referenceId", width: 22 },
     { header: "Course", key: "course", width: 20 },
-    { header: "Branch", key: "branch", width: 24 },
+    { header: "Branch", key: "branch", width: 26 },
     { header: "Year", key: "year", width: 14 },
     { header: "College name", key: "collegeName", width: 35 },
     { header: "College location", key: "collegeLocation", width: 30 },
@@ -44,6 +68,7 @@ async function generateApplicationsWorkbook() {
     { header: "Duration", key: "duration", width: 18 },
     { header: "Division Allotted", key: "division", width: 24 },
     { header: "Seat Number", key: "seatNumber", width: 16 },
+    { header: "Internship Type", key: "internshipType", width: 18 },
     { header: "Status", key: "status", width: 15 },
   ];
 
@@ -62,13 +87,42 @@ async function generateApplicationsWorkbook() {
   let index = 1;
   for (const student of students) {
     const training = student.trainingManagement || {};
-    const branch = training.branch || student.branch || "";
-    const collegeName = training.collegeName || student.collegeName || "";
-    const collegeLocation = training.collegeLocation || student.collegeLocation || student.location || student.collegeAddress || "";
-    const course = training.courseName || student.course || "";
-    const year = training.courseYear || student.year || "";
+    
+    // Resolve branch from trainingManagement or student record fields
+    const rawBranch =
+      training.branch ||
+      student.branch ||
+      student.discipline ||
+      student.department ||
+      student.specialization ||
+      student.stream ||
+      student.trade ||
+      "";
+    
+    const rawCourse = training.courseName || student.course || "";
+
+    let branch = normalizeBranch(rawBranch) || rawBranch;
+    if (!branch && rawCourse) {
+      branch = extractBranchFromCourse(rawCourse);
+    }
+
+    const course = normalizeCourseName(rawCourse) || rawCourse;
+    const year = training.courseYear || student.courseYear || student.year || student.currentYear || "";
+    const collegeName = training.collegeName || student.collegeName || student.institution || student.university || "";
+    const collegeLocation = training.collegeLocation || student.collegeLocation || student.location || student.collegeAddress || student.currentAddress || "";
     const studentName = training.studentName || student.name || "";
     const duration = training.trainingDuration || student.internshipDuration || student.duration || "";
+    const division =
+      training.division ||
+      student.division ||
+      student.allottedDivision ||
+      student.recommendedBy ||
+      "";
+    const seatNumber =
+      student.serialNumber ||
+      training.seatNumber ||
+      student.seatNumber ||
+      "";
 
     const row = worksheet.addRow({
       sno: index++,
@@ -85,16 +139,9 @@ async function generateApplicationsWorkbook() {
       dob: student.dob ? formatExportDate(student.dob) : "",
       cgpa: student.cgpa || "",
       duration,
-      division:
-        training.division ||
-        student.recommendedBy ||
-        student.division ||
-        "",
-      seatNumber:
-        student.serialNumber ||
-        training.seatNumber ||
-        student.seatNumber ||
-        "",
+      division,
+      seatNumber,
+      internshipType: student.internshipType || "Paid",
       status: student.status || "Pending",
     });
     row.alignment = { vertical: "middle" };

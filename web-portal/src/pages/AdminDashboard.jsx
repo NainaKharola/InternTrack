@@ -32,6 +32,26 @@ const escapeHtml = (value) => String(value ?? "").replace(/&/g, "&amp;").replace
 
 function formatReportDate(value) {
   if (!value) return "";
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$/.test(trimmed)) return trimmed;
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      const year = isoMatch[1];
+      const monthIdx = parseInt(isoMatch[2], 10) - 1;
+      const day = isoMatch[3];
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${day} ${months[monthIdx] || ""} ${year}`;
+    }
+    const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (slashMatch) {
+      const day = String(slashMatch[1]).padStart(2, '0');
+      const monthIdx = parseInt(slashMatch[2], 10) - 1;
+      const year = slashMatch[3];
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${day} ${months[monthIdx] || ""} ${year}`;
+    }
+  }
   const date = new Date(value);
   if (isNaN(date.getTime())) return String(value);
   const day = String(date.getDate()).padStart(2, '0');
@@ -223,7 +243,9 @@ function AdminDashboard() {
         const discipline = `${student.course || ""} - ${student.branch || ""}`;
         const joiningDate = training.fromDate ? formatReportDate(training.fromDate) : "";
         const completionDate = training.toDate ? formatReportDate(training.toDate) : "";
-        const resignationDate = student.resignationStatus === "Yes" && student.resignationDate ? formatReportDate(student.resignationDate) : "";
+        const rawResDate = student.resignationDate || student.trainingManagement?.resignationDate || "";
+        const isResigned = student.resignationStatus === "Yes" || String(student.resignationStatus).toLowerCase() === "yes" || Boolean(rawResDate);
+        const resignationDate = (isResigned && rawResDate) ? formatReportDate(rawResDate) : (rawResDate ? formatReportDate(rawResDate) : "");
 
         return {
           _id: student._id,

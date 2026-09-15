@@ -178,9 +178,12 @@ async function editPreview(req, res) {
       return res
         .status(404)
         .json({ success: false, message: "Gyapan not found." });
-    const rows = Array.isArray(req.body.studentRows)
+    const rows = (Array.isArray(req.body.studentRows)
       ? req.body.studentRows
-      : [];
+      : []).map((row) => ({
+        ...row,
+        duration: "6 months",
+      }));
     if (
       !rows.length ||
       !rows.every((row) => row.studentName && row.course && row.collegeName)
@@ -234,13 +237,45 @@ async function generateFinalPdf(req, res) {
       return res
         .status(404)
         .json({ success: false, message: "Gyapan not found." });
-    if (gyapan.generated)
-      return res.json({
-        success: true,
-        gyapan,
-        pdfUrl: gyapan.pdfUrl,
-        message: "Gyapan PDF has already been generated.",
-      });
+
+    // Refresh rows from latest student database records if available
+    if (Array.isArray(gyapan.selectedStudents) && gyapan.selectedStudents.length > 0) {
+      const freshStudents = await Student.find({ _id: { $in: gyapan.selectedStudents } }).lean();
+      if (freshStudents.length > 0) {
+        const studentMap = new Map(freshStudents.map(s => [String(s._id), s]));
+        const updatedRows = (gyapan.studentRows || []).map(row => {
+          const fresh = studentMap.get(String(row.studentId));
+          if (fresh) {
+            const freshRow = studentToRow(fresh);
+            return {
+              ...row,
+              studentName: freshRow.studentName,
+              course: freshRow.course,
+              courseYear: freshRow.courseYear,
+              branch: freshRow.branch,
+              collegeName: freshRow.collegeName,
+              collegeLocation: freshRow.collegeLocation,
+              collegeAddress: freshRow.collegeAddress,
+              duration: "6 months",
+              trainingStartDate: freshRow.trainingStartDate || row.trainingStartDate,
+              trainingEndDate: freshRow.trainingEndDate || row.trainingEndDate,
+            };
+          }
+          return {
+            ...row,
+            duration: "6 months",
+          };
+        });
+        gyapan.studentRows = updatedRows;
+        gyapan.html = await generateGyapanHtml({
+          rows: updatedRows,
+          letterNumber: gyapan.letterNumber,
+          issueDate: gyapan.issueDate,
+          division: updatedRows[0]?.division || ""
+        });
+      }
+    }
+
     const pdf = await generatePdfFromHtml(gyapan.html);
     const { uploadFile } = require("../services/s3StorageService");
     const filename = `Gyapan-${gyapan._id}-${Date.now()}.pdf`;
@@ -266,6 +301,10 @@ async function generateFinalPdf(req, res) {
       description: `Printed final Joining ISM PDF for letter number '${gyapan.letterNumber}'.`,
       status: "Success",
     });
+
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
 
     return res.json({
       success: true,
