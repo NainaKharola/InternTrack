@@ -1,0 +1,24 @@
+reviews:
+  profile: assertive
+
+  request_changes_workflow: true
+
+  high_level_summary: true
+
+  auto_review:
+    enabled: true
+    drafts: true
+
+  path_instructions:
+    - path: "backend/**"
+      instructions: |
+        Perform a thorough security review of backend code.
+        Focus on authentication, authorization, SQL injection,
+        input validation, file access, path traversal, IDOR,
+        sensitive data exposure, and insecure API endpoints.
+
+    - path: "web-portal/src/**"
+      instructions: |
+        Perform a thorough security review of frontend code.
+        Focus on XSS, unsafe rendering, exposed secrets,
+        insecure API usage, authentication, and sensitive data handling.
