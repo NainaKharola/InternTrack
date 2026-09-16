@@ -145,6 +145,8 @@ function validateStepTwo(form) {
   checks.forEach(([field, allowedTypes, message]) => {
     if (!form[field]) {
       errors[field] = field === "aadhaarCard" ? "Please upload your Aadhaar Card." : "This field is required.";
+    } else if (typeof form[field].size === "number" && form[field].size === 0) {
+      errors[field] = field === "photo" ? "Photo must not be empty." : "Selected file must not be empty.";
     } else if (!allowedTypes.includes(form[field].type)) {
       errors[field] = message;
     } else if (form[field].size > fileLimits[field]) {
