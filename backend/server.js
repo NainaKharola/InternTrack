@@ -204,7 +204,6 @@ app.use((req, res, next) => {
   const isPublicAuthRoute =
     requestPath === "/api/admin/auth/register" ||
     requestPath === "/api/admin/auth/login" ||
-    requestPath === "/api/admin/auth/logout" ||
     requestPath.startsWith("/api/admin/auth/recovery") ||
     requestPath === "/api/students/login" ||
     (requestPath === "/api/students" && req.method === "POST");
