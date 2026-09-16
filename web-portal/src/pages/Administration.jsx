@@ -11,6 +11,7 @@ import {
 import DivisionBranchVacancyConfiguration from "../components/Admin/DivisionBranchVacancyConfiguration";
 import DivisionBranchAnalytics from "../components/Admin/DivisionBranchAnalytics";
 import DivisionStudentDistribution from "../components/Admin/DivisionStudentDistribution";
+import { normalizeBranch } from "../data/branches";
 import "../styles/admin.css";
 
 function Administration() {
@@ -45,7 +46,7 @@ function Administration() {
   const totalStudents = useMemo(() => filteredStudents.length, [filteredStudents]);
   const paidStudents = useMemo(() => filteredStudents.filter(s => (s.internshipType || "").toLowerCase() === "paid").length, [filteredStudents]);
   const unpaidStudents = useMemo(() => filteredStudents.filter(s => (s.internshipType || "Unpaid").toLowerCase() === "unpaid").length, [filteredStudents]);
-  const totalBranches = useMemo(() => new Set(filteredStudents.map(s => s.branch).filter(Boolean)).size, [filteredStudents]);
+  const totalBranches = useMemo(() => new Set(filteredStudents.map(s => normalizeBranch(s.trainingManagement?.branch || s.branch || s.discipline || s.department || "") || s.branch).filter(Boolean)).size, [filteredStudents]);
   const totalDivisions = useMemo(() => administration?.divisions?.length || 0, [administration]);
 
   const applyAdministration = useCallback((next, successMessage = "") => {

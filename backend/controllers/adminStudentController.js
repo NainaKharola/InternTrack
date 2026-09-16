@@ -253,7 +253,7 @@ async function getStudents(req, res) {
     const filter = buildStudentFilter(req.query);
     const sort = buildSort(req.query.sortBy, req.query.sortOrder);
     const projection =
-      "_id referenceId name gender dob course collegeName location email phone branch year cgpa submittedAt status recommendedBy trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType completedStatus bankDetails paidInternshipProjectDetails firstQuarterReport secondQuarterReport";
+      "_id referenceId name gender dob course collegeName location email phone branch year cgpa submittedAt status recommendedBy division trainingManagement offerLetterStatus approvedDate certificateGenerated gyapanGenerated internshipType completedStatus bankDetails paidInternshipProjectDetails firstQuarterReport secondQuarterReport";
 
     const [
       students,
@@ -553,7 +553,24 @@ async function updateStudentReview(req, res) {
       student.approvedDate = new Date();
     }
 
-    if (student.trainingManagement) {
+    if (!student.trainingManagement && student.status === "Approved") {
+      student.trainingManagement = {
+        studentName: student.name,
+        courseName: student.course,
+        courseYear: student.year,
+        branch: student.branch,
+        collegeName: student.collegeName,
+        collegeLocation: student.location,
+        trainingDuration: student.internshipDuration,
+        collegeAddress: student.collegeAddress,
+        division: student.recommendedBy || student.division || "",
+        resignationStatus: student.resignationStatus || "No",
+        resignationDate: student.resignationDate,
+      };
+    } else if (student.trainingManagement) {
+      if (!student.trainingManagement.division && (student.recommendedBy || student.division)) {
+        student.trainingManagement.division = student.recommendedBy || student.division;
+      }
       student.trainingManagement.studentName = student.name;
       student.trainingManagement.courseName = student.course;
       student.trainingManagement.courseYear = student.year;
@@ -792,7 +809,7 @@ async function saveTrainingManagement(req, res) {
     student.collegeName = training.collegeName;
     student.location = training.collegeLocation;
     student.collegeLocation = training.collegeLocation;
-    student.collegeAddress = training.collegeLocation || student.collegeAddress;
+    student.collegeAddress = training.collegeAddress || student.collegeAddress;
 
     student.internshipDuration = training.trainingDuration;
 
@@ -807,7 +824,7 @@ async function saveTrainingManagement(req, res) {
 
       student.offerLetter.collegeName = training.collegeName;
       student.offerLetter.collegeLocation = training.collegeLocation;
-      student.offerLetter.collegeAddress = training.collegeLocation || student.offerLetter.collegeAddress;
+      student.offerLetter.collegeAddress = training.collegeAddress || student.offerLetter.collegeAddress;
 
       student.offerLetter.internshipDuration = training.trainingDuration;
       // Invalidate cached offerLetter HTML so fresh documents use new data

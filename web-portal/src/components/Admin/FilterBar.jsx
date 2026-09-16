@@ -9,7 +9,7 @@ function uniqueOptions(students, key) {
 }
 
 function uniqueDivisions(students) {
-  return [...new Set(students.map((student) => student.trainingManagement?.division).filter(Boolean))]
+  return [...new Set(students.map((student) => student.trainingManagement?.division || student.division || student.recommendedBy).filter(Boolean))]
     .sort((a, b) => String(a).localeCompare(String(b)));
 }
 

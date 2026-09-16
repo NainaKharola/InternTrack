@@ -1,8 +1,12 @@
 import { normalizeBranch } from "../data/branches.js";
 
 export function getAllocatedStudents(students, divisions) {
-  const divisionSet = new Set(divisions);
-  return (students || []).filter((student) => student.status === "Approved" && divisionSet.has(student.trainingManagement?.division));
+  const divisionSet = new Set((divisions || []).map((d) => String(d || "").trim().toLowerCase()));
+  return (students || []).filter((student) => {
+    if (student.status !== "Approved") return false;
+    const div = String(student.trainingManagement?.division || student.division || student.recommendedBy || "").trim().toLowerCase();
+    return Boolean(div && divisionSet.has(div));
+  });
 }
 
 const nonNegativeNumber = (value) => Math.max(0, Number(value) || 0);
@@ -97,7 +101,7 @@ export function getBranchDivisionRecommendations(divisions, configurations, stud
     const allocated = getAllocatedStudents(students, divisions);
     const branchAllocated = allocated.filter((s) => {
       const sBranch = normalizeBranch(s.trainingManagement?.branch || s.branch || s.discipline || s.department || "") || s.branch || "";
-      return s.trainingManagement?.division === division && sBranch.toLowerCase() === targetBranch.toLowerCase();
+      return (s.trainingManagement?.division || s.division || s.recommendedBy) === division && sBranch.toLowerCase() === targetBranch.toLowerCase();
     });
 
     const paidAllocated = branchAllocated.filter(s => s.internshipType === "Paid").length;
@@ -140,7 +144,10 @@ export function getBranchDivisionRecommendations(divisions, configurations, stud
 
 export function getDivisionAllocationRows(divisions, configurations, students) {
   const allocated = getAllocatedStudents(students, divisions);
-  const allocations = allocated.reduce((counts, student) => ({ ...counts, [student.trainingManagement?.division]: (counts[student.trainingManagement?.division] || 0) + 1 }), {});
+  const allocations = allocated.reduce((counts, student) => {
+    const div = student.trainingManagement?.division || student.division || student.recommendedBy;
+    return { ...counts, [div]: (counts[div] || 0) + 1 };
+  }, {});
   return sortRecommendations((divisions || []).map((division) => {
     const allocatedStudents = allocations[division] || 0;
     const totalVacancy = calculateTotalVacancy(configurations?.[division]);
@@ -169,8 +176,8 @@ export function getGeneralDivisionRecommendations(divisions, configurations, stu
     }, 0);
     const paidConfiguredSeats = typeCapacity("paid");
     const unpaidConfiguredSeats = typeCapacity("unpaid");
-    const paidAllocatedStudents = allocated.filter((student) => student.trainingManagement?.division === division && student.internshipType === "Paid").length;
-    const unpaidAllocatedStudents = allocated.filter((student) => student.trainingManagement?.division === division && student.internshipType !== "Paid").length;
+    const paidAllocatedStudents = allocated.filter((student) => (student.trainingManagement?.division || student.division || student.recommendedBy) === division && student.internshipType === "Paid").length;
+    const unpaidAllocatedStudents = allocated.filter((student) => (student.trainingManagement?.division || student.division || student.recommendedBy) === division && student.internshipType !== "Paid").length;
     const availablePaidSeats = calculateAvailableSeats(paidConfiguredSeats, paidAllocatedStudents);
     const availableUnpaidSeats = calculateAvailableSeats(unpaidConfiguredSeats, unpaidAllocatedStudents);
     const configuredSeats = paidConfiguredSeats + unpaidConfiguredSeats;

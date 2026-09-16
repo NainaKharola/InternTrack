@@ -141,8 +141,8 @@ export default function DivisionStudentDistribution({ administration, students, 
     const counts = {};
     administration.divisions.forEach((div) => { counts[div] = { paid: 0, unpaid: 0, total: 0 }; });
     getAllocatedStudents(students, administration.divisions).forEach((student) => {
-      const div = student.trainingManagement?.division;
-      if (Object.prototype.hasOwnProperty.call(counts, div)) {
+      const div = student.trainingManagement?.division || student.division || student.recommendedBy;
+      if (div && Object.prototype.hasOwnProperty.call(counts, div)) {
         const type = (student.internshipType || "Unpaid").toLowerCase();
         if (type === "paid") {
           counts[div].paid++;

@@ -90,7 +90,8 @@ function Reports() {
           : filters.status === "Joined"
             ? training.joined === "Yes"
             : training.completed === "Yes";
-      if (!statusMatch || (filters.division && training.division !== filters.division)) return false;
+      const studentDiv = training.division || student.division || student.recommendedBy || "";
+      if (!statusMatch || (filters.division && studentDiv !== filters.division)) return false;
       if (filters.internshipType) {
         const type = student.internshipType === "Paid" ? "Paid" : "Unpaid";
         if (type !== filters.internshipType) return false;

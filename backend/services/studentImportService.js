@@ -334,7 +334,6 @@ async function importStudentsFromExcel(buffer, options = {}) {
         if (isNonEmptyValue(rowValues.collegeLocation)) {
           updates.location = rowValues.collegeLocation;
           updates.collegeLocation = rowValues.collegeLocation;
-          updates.collegeAddress = rowValues.collegeLocation;
           newTraining.collegeLocation = rowValues.collegeLocation;
           trainingUpdated = true;
         }
@@ -465,7 +464,7 @@ async function importStudentsFromExcel(buffer, options = {}) {
           collegeName: collegeName,
           location: collegeLocation,
           collegeLocation: collegeLocation,
-          collegeAddress: collegeLocation,
+          collegeAddress: isNonEmptyValue(rowValues.collegeAddress) ? rowValues.collegeAddress : "",
           branch: branch,
           course: course,
           year: year,

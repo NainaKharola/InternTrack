@@ -546,7 +546,7 @@ function AdminDashboard() {
     // Frontend division filter (since backend does not support filtering by division)
     if (filters.division) {
       result = result.filter(
-        (student) => student.trainingManagement?.division === filters.division
+        (student) => (student.trainingManagement?.division || student.division || student.recommendedBy) === filters.division
       );
     }
 
@@ -572,8 +572,8 @@ function AdminDashboard() {
             right = b.branch || "";
             break;
           case "division":
-            left = a.trainingManagement?.division || "";
-            right = b.trainingManagement?.division || "";
+            left = a.trainingManagement?.division || a.division || a.recommendedBy || "";
+            right = b.trainingManagement?.division || b.division || b.recommendedBy || "";
             break;
           case "year":
             left = a.year || "";

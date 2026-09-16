@@ -76,7 +76,19 @@ function buildTemplateData(student, overrides = {}) {
   const branch = overrides.branch || training.branch || student.branch || offer.branch || "";
   const collegeName = overrides.collegeName || training.collegeName || student.collegeName || offer.collegeName || "";
   const collegeLocation = overrides.collegeLocation || training.collegeLocation || student.location || student.collegeLocation || offer.collegeLocation || "";
-  const collegeAddress = overrides.collegeAddress || training.collegeAddress || student.collegeAddress || student.location || offer.collegeAddress || collegeLocation || "";
+  const rawCollegeAddress = overrides.collegeAddress || training.collegeAddress || student.collegeAddress || offer.collegeAddress || "";
+
+  const isDuplicateLocation = rawCollegeAddress && collegeLocation && (rawCollegeAddress.trim().toLowerCase() === collegeLocation.trim().toLowerCase());
+  const collegeAddress = isDuplicateLocation ? "" : (rawCollegeAddress ? rawCollegeAddress.trim() : "");
+
+  const addressLines = [];
+  if (collegeAddress) {
+    addressLines.push(escapeHtml(collegeAddress));
+  }
+  if (collegeLocation) {
+    addressLines.push(escapeHtml(collegeLocation));
+  }
+  const collegeAddressBlock = addressLines.join("<br />");
 
   return {
     logoUrl: overrides.logoUrl || logoBase64,
@@ -90,6 +102,7 @@ function buildTemplateData(student, overrides = {}) {
     collegeName,
     collegeLocation,
     collegeAddress,
+    collegeAddressBlock,
 
     internshipDuration: duration,
     duration,
@@ -112,9 +125,9 @@ async function generateOfferLetterHtml(student, overrides = {}) {
   const data = buildTemplateData(student, overrides);
 
   return template.replace(/{{(\w+)}}/g, (match, key) => {
-    // Don't escape Base64 image URLs
-    if (key === "logoUrl" || key === "bannerUrl" || key === "swachhUrl") {
-      return data[key];
+    // Don't escape Base64 image URLs or safe HTML address blocks
+    if (key === "logoUrl" || key === "bannerUrl" || key === "swachhUrl" || key === "collegeAddressBlock") {
+      return data[key] ?? "";
     }
 
     return escapeHtml(data[key] ?? "");

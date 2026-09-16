@@ -60,6 +60,7 @@ function buildEditableFields(student) {
     studentName: data.studentName,
     collegeName: data.collegeName,
     collegeLocation: data.collegeLocation,
+    collegeAddress: data.collegeAddress,
     course: data.course,
     year: data.year,
     branch: data.branch,
@@ -177,6 +178,7 @@ async function updateOfferLetter(req, res) {
       "studentName",
       "collegeName",
       "collegeLocation",
+      "collegeAddress",
       "course",
       "year",
       "branch",
@@ -223,6 +225,9 @@ async function updateOfferLetter(req, res) {
     student.collegeName = updates.collegeName || student.collegeName;
 
     student.location = updates.collegeLocation || student.location;
+    if (updates.collegeAddress !== undefined) {
+      student.collegeAddress = updates.collegeAddress;
+    }
 
     student.internshipDuration =
       updates.internshipDuration || student.internshipDuration;
@@ -236,6 +241,9 @@ async function updateOfferLetter(req, res) {
       student.trainingManagement.branch = student.branch;
       student.trainingManagement.collegeName = student.collegeName;
       student.trainingManagement.collegeLocation = student.location;
+      if (updates.collegeAddress !== undefined) {
+        student.trainingManagement.collegeAddress = updates.collegeAddress;
+      }
       student.trainingManagement.trainingDuration = student.internshipDuration;
     }
 
