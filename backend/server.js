@@ -14,6 +14,7 @@ if (missingEnv.length > 0) {
 }
 
 const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 const path = require("path");
 const express = require("express");
 const cors = require("cors");
@@ -199,8 +200,26 @@ app.use((req, res, next) => {
     }
   }
 
-  // Double-submit token validation specifically for requests relying on the authentication cookie "token"
-  const isCookieAuthenticated = Boolean(req.cookies?.token);
+  const requestPath = req.originalUrl ? req.originalUrl.split("?")[0] : req.path;
+  const isPublicAuthRoute =
+    requestPath === "/api/admin/auth/login" ||
+    requestPath.startsWith("/api/admin/auth/recovery") ||
+    requestPath === "/api/students/login" ||
+    (requestPath === "/api/students" && req.method === "POST");
+
+  // Validate if cookie contains an active, valid JWT session (not stale or expired)
+  let isValidSessionCookie = false;
+  if (req.cookies?.token && process.env.JWT_SECRET) {
+    try {
+      jwt.verify(req.cookies.token, process.env.JWT_SECRET);
+      isValidSessionCookie = true;
+    } catch {
+      isValidSessionCookie = false;
+    }
+  }
+
+  // Double-submit token validation specifically for genuinely authenticated requests relying on the authentication cookie "token"
+  const isCookieAuthenticated = isValidSessionCookie && !isPublicAuthRoute;
 
   if (isCookieAuthenticated) {
     const cookieCsrfToken = req.cookies?._csrf;

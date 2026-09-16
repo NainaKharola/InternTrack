@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 // Allowed photo MIME types for safe local image preview rendering
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB max preview size
+const MAX_PHOTO_SIZE_BYTES = 1 * 1024 * 1024; // 1 MB max preview size (matches StudentForm.validateStepTwo)
 
 function FileInput({ label, name, onChange, error, required = false, accept }) {
   const [selectedPhotoFile, setSelectedPhotoFile] = useState(null);
