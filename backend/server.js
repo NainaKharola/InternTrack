@@ -13,6 +13,7 @@ if (missingEnv.length > 0) {
   process.exit(1);
 }
 
+const crypto = require("crypto");
 const path = require("path");
 const express = require("express");
 const cors = require("cors");
@@ -141,6 +142,24 @@ app.use(cookieParser());
 // ========================
 // CSRF Protection for State-Changing Requests
 // ========================
+const csrfCookieOptions = {
+  httpOnly: false,
+  secure: isProduction,
+  sameSite: "lax",
+  path: "/",
+};
+
+app.use((req, res, next) => {
+  // Ensure client receives a secure CSRF cookie for double-submit verification
+  if (!req.cookies?._csrf) {
+    const token = crypto.randomBytes(32).toString("hex");
+    res.cookie("_csrf", token, csrfCookieOptions);
+    req.cookies = req.cookies || {};
+    req.cookies._csrf = token;
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   // Safe HTTP read methods do not alter state
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
@@ -157,21 +176,65 @@ app.use((req, res, next) => {
   const origin = req.headers["origin"];
   const referer = req.headers["referer"];
 
-  if (!origin && !referer) {
-    if (isProduction && req.cookies && Object.keys(req.cookies).length > 0) {
-      return res.status(403).json({ success: false, message: "CSRF verification failed: missing request origin." });
+  let requestOrigin = origin || null;
+  if (!requestOrigin && referer) {
+    try {
+      requestOrigin = new URL(referer).origin;
+    } catch {
+      requestOrigin = null;
     }
-    return next();
   }
 
-  const requestOrigin = origin || (referer ? new URL(referer).origin : null);
-  const isAllowedOrigin = !requestOrigin || allowedOrigins.includes(requestOrigin) || (!isProduction && requestOrigin.includes("localhost"));
+  if (!requestOrigin) {
+    if (isProduction && req.cookies?.token) {
+      return res.status(403).json({ success: false, message: "CSRF verification failed: missing or invalid request origin." });
+    }
+  } else {
+    const isAllowedOrigin = allowedOrigins.includes(requestOrigin) || (!isProduction && requestOrigin.includes("localhost"));
+    if (!isAllowedOrigin) {
+      return res.status(403).json({
+        success: false,
+        message: "CSRF verification failed: untrusted request origin."
+      });
+    }
+  }
 
-  if (!isAllowedOrigin) {
-    return res.status(403).json({
-      success: false,
-      message: "CSRF verification failed: untrusted request origin."
-    });
+  // Double-submit token validation specifically for requests relying on the authentication cookie "token"
+  const isCookieAuthenticated = Boolean(req.cookies?.token);
+
+  if (isCookieAuthenticated) {
+    const cookieCsrfToken = req.cookies?._csrf;
+    const headerCsrfToken = req.headers["x-csrf-token"] || req.headers["x-xsrf-token"];
+
+    if (!cookieCsrfToken || typeof cookieCsrfToken !== "string") {
+      return res.status(403).json({
+        success: false,
+        message: "CSRF verification failed: missing CSRF cookie."
+      });
+    }
+
+    if (!headerCsrfToken || typeof headerCsrfToken !== "string") {
+      return res.status(403).json({
+        success: false,
+        message: "CSRF verification failed: missing CSRF token header."
+      });
+    }
+
+    try {
+      const cookieBuf = Buffer.from(cookieCsrfToken, "utf8");
+      const headerBuf = Buffer.from(headerCsrfToken, "utf8");
+      if (cookieBuf.length !== headerBuf.length || !crypto.timingSafeEqual(cookieBuf, headerBuf)) {
+        return res.status(403).json({
+          success: false,
+          message: "CSRF verification failed: token mismatch."
+        });
+      }
+    } catch {
+      return res.status(403).json({
+        success: false,
+        message: "CSRF verification failed: invalid token."
+      });
+    }
   }
 
   next();
@@ -211,13 +274,22 @@ app.use("/uploads", fileDownloadLimiter, protectFileAccess, async (req, res, nex
 });
 
 // ========================
-// Health Check
+// Health Check & CSRF Token Routes
 // ========================
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
     message: "Student Registration Backend is running",
   });
+});
+
+app.get("/api/csrf-token", (req, res) => {
+  let token = req.cookies?._csrf;
+  if (!token) {
+    token = crypto.randomBytes(32).toString("hex");
+    res.cookie("_csrf", token, csrfCookieOptions);
+  }
+  res.json({ success: true, csrfToken: token });
 });
 
 // ========================
