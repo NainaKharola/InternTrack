@@ -60,7 +60,7 @@ const standardBranches = [
 
 function normalizeBranch(branch) {
   if (!branch || typeof branch !== "string") return "";
-  const raw = branch.trim();
+  const raw = branch.trim().slice(0, 200);
   if (!raw || raw === "-" || raw.toLowerCase() === "null" || raw.toLowerCase() === "undefined") return "";
 
   // 1. Direct exact match
@@ -68,18 +68,21 @@ function normalizeBranch(branch) {
   if (exact) return exact;
 
   // Check if string contains branch in parentheses, e.g. "B.Tech (CSE)" or "B.E (ECE)"
-  const matchParen = raw.match(/\(([^)]+)\)/);
-  if (matchParen && matchParen[1]) {
-    const inside = normalizeBranch(matchParen[1]);
-    if (inside && inside !== matchParen[1].trim()) return inside;
+  const openParen = raw.indexOf("(");
+  const closeParen = raw.indexOf(")", openParen + 1);
+  if (openParen !== -1 && closeParen !== -1 && closeParen > openParen + 1) {
+    const inside = raw.slice(openParen + 1, closeParen).trim();
+    const normalizedInside = normalizeBranch(inside);
+    if (normalizedInside && normalizedInside !== inside) return normalizedInside;
   }
 
   // 2. Clean extraneous branch codes or numbers in parentheses / brackets like (01), [CSE]
+  // Using linear non-overlapping string replacements to eliminate ReDoS risk
   let clean = raw
-    .replace(/\s*\([0-9a-zA-Z\s_-]+\)\s*/g, " ")
-    .replace(/\s*\[[0-9a-zA-Z\s_-]+\]\s*/g, " ")
-    .replace(/^\s*\d+\s*[-_.:]\s*/, "")
-    .replace(/\s*[-_.:]\s*\d+\s*$/, "")
+    .replace(/\([a-zA-Z0-9_\s-]+\)/g, " ")
+    .replace(/\[[a-zA-Z0-9_\s-]+\]/g, " ")
+    .replace(/^\d+[-_.:]\s*/, "")
+    .replace(/\s*[-_.:]\d+$/, "")
     .replace(/&/g, "and")
     .replace(/\s+/g, " ")
     .trim();

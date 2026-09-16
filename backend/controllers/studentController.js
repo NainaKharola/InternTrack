@@ -107,19 +107,21 @@ function validateRequest(body, files) {
     return `Missing required fields: ${allMissing.join(", ")}`;
   }
 
-  if (!/^\d{10}$/.test(body.phone)) {
+  const { isValidEmail, isValidPhone, isValidAadhaar } = require("../utils/validation");
+
+  if (!isValidPhone(body.phone)) {
     return "Phone number must be exactly 10 digits.";
   }
 
-  if (!/^\d{10}$/.test(body.fatherPhone)) {
+  if (!isValidPhone(body.fatherPhone)) {
     return "Father contact number must be exactly 10 digits.";
   }
 
-  if (!/^\d{12}$/.test(body.aadhaarNumber)) {
+  if (!isValidAadhaar(body.aadhaarNumber)) {
     return "Aadhaar Number must contain exactly 12 digits.";
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
+  if (!isValidEmail(body.email)) {
     return "Enter a valid email address.";
   }
 

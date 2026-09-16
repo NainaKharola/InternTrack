@@ -45,7 +45,7 @@ const createGyapanRouter = require("./gyapanRoutes");
 const { getConfiguration, addDivision, updateDivision, deleteDivision, updateSeats, getDivisionConfigurations, saveDivisionConfigurations, saveProformaConfig, updateCertificateNumber } = require("../controllers/administrationController");
 const { listColleges, createCollege, editCollege, removeCollege } = require("../controllers/collegeController");
 const managementController = require("../controllers/managementController");
-const { authLimiter, recoveryLimiter } = require("../middleware/rateLimiter");
+const { authLimiter, recoveryLimiter, uploadLimiter, documentGenerationLimiter } = require("../middleware/rateLimiter");
 
 const router = express.Router();
 
@@ -105,14 +105,14 @@ router.get("/recommended-by-options", protectAdmin, (req, res) => {
   });
 });
 
-router.post("/students/import", protectAdmin, excelUpload.single("file"), importStudents);
+router.post("/students/import", protectAdmin, uploadLimiter, excelUpload.single("file"), importStudents);
 router.get("/applications/export", protectAdmin, exportApplications);
 
 router.get("/students", protectAdmin, getStudents);
 router.get("/certificates/students", protectAdmin, getCertificateStudents);
-router.post("/certificates/download", protectAdmin, downloadCertificates);
+router.post("/certificates/download", protectAdmin, documentGenerationLimiter, downloadCertificates);
 router.get("/certificate1/students", protectAdmin, (req, res, next) => { req.bufferMode = true; next(); }, getCertificateStudents);
-router.post("/certificate1/download", protectAdmin, (req, res, next) => { req.bufferMode = true; next(); }, downloadCertificates);
+router.post("/certificate1/download", protectAdmin, documentGenerationLimiter, (req, res, next) => { req.bufferMode = true; next(); }, downloadCertificates);
 router.delete("/certificate1/students", protectAdmin, removeCertificateBufferStudents);
 router.delete("/students", protectAdmin, deleteStudents);
 router.get("/students/:id", protectAdmin, getStudentById);
@@ -131,6 +131,6 @@ router.post(
   uploadOfferLetter
 );
 
-router.post("/attendance-report/pdf", protectAdmin, generateReportPdf);
+router.post("/attendance-report/pdf", protectAdmin, documentGenerationLimiter, generateReportPdf);
 
 module.exports = router;

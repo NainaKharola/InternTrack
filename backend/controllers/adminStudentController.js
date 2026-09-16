@@ -197,6 +197,8 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString("en-IN");
 }
 
+const { isValidEmail, isValidPhone, isValidAadhaar, parseDurationSafe } = require("../utils/validation");
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -212,20 +214,25 @@ function addDurationToDate(fromDate, duration) {
   const date = new Date(fromDate);
   if (Number.isNaN(date.getTime())) return "";
 
-  const monthMatch = String(duration || "").match(/(\d+)\s*month/i);
-  const weekMatch = String(duration || "").match(/(\d+)\s*week/i);
+  const { unit, value } = parseDurationSafe(duration);
 
-  if (monthMatch) { date.setMonth(date.getMonth() + Number(monthMatch[1])); date.setDate(date.getDate() - 1); }
-  else if (weekMatch) date.setDate(date.getDate() + Number(weekMatch[1]) * 7 - 1);
-  else return "";
+  if (unit === "month" && value > 0) {
+    date.setMonth(date.getMonth() + value);
+    date.setDate(date.getDate() - 1);
+  } else if (unit === "week" && value > 0) {
+    date.setDate(date.getDate() + value * 7 - 1);
+  } else {
+    return "";
+  }
 
   return date.toISOString().slice(0, 10);
 }
 
 function normalizePaidDuration(value) {
-  const match = String(value || "").trim().match(/^(\d+)\s*(?:months?)?$/i);
+  const str = String(value || "").trim().slice(0, 30);
+  const match = str.match(/^(\d{1,3})\s*(?:months?)?$/i);
   const months = match ? Number(match[1]) : NaN;
-  return Number.isSafeInteger(months) && months > 0 ? `${months} Months` : "";
+  return Number.isSafeInteger(months) && months > 0 && months <= 120 ? `${months} Months` : "";
 }
 
 async function removeStudentAssets(student) {
@@ -1029,19 +1036,19 @@ async function updateStudentDetails(req, res) {
       return res.status(400).json({ success: false, message: "Select a valid gender." });
     }
 
-    if (body.phone && !/^\d{10}$/.test(body.phone)) {
+    if (body.phone && !isValidPhone(body.phone)) {
       return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits." });
     }
 
-    if (body.fatherPhone && !/^\d{10}$/.test(body.fatherPhone)) {
+    if (body.fatherPhone && !isValidPhone(body.fatherPhone)) {
       return res.status(400).json({ success: false, message: "Father contact number must be exactly 10 digits." });
     }
 
-    if (body.aadhaarNumber && !/^\d{12}$/.test(body.aadhaarNumber)) {
+    if (body.aadhaarNumber && !isValidAadhaar(body.aadhaarNumber)) {
       return res.status(400).json({ success: false, message: "Aadhaar Number must contain exactly 12 digits." });
     }
 
-    if (body.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
+    if (body.email && !isValidEmail(body.email)) {
       return res.status(400).json({ success: false, message: "Enter a valid email address." });
     }
 

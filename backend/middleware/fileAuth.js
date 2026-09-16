@@ -53,19 +53,20 @@ async function protectFileAccess(req, res, next) {
       }
 
       // Identify the file path (ignoring query parameters)
-      const relativePath = decodeURIComponent(req.originalUrl.split("?")[0]);
+      const rawPath = decodeURIComponent(req.originalUrl.split("?")[0]);
+      const safeEscapedPath = rawPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       
       // Find the student owner of this file path
       const owner = await Student.findOne({
         $or: [
-          { "resume.url": { $regex: relativePath } },
-          { "result.url": { $regex: relativePath } },
-          { "photo.url": { $regex: relativePath } },
-          { "permissionLetter.url": { $regex: relativePath } },
-          { "aadhaarCard.url": { $regex: relativePath } },
-          { "completedDocuments.url": { $regex: relativePath } },
-          { "offerLetter.url": { $regex: relativePath } },
-          { "offerLetterUrl": { $regex: relativePath } }
+          { "resume.url": { $regex: safeEscapedPath } },
+          { "result.url": { $regex: safeEscapedPath } },
+          { "photo.url": { $regex: safeEscapedPath } },
+          { "permissionLetter.url": { $regex: safeEscapedPath } },
+          { "aadhaarCard.url": { $regex: safeEscapedPath } },
+          { "completedDocuments.url": { $regex: safeEscapedPath } },
+          { "offerLetter.url": { $regex: safeEscapedPath } },
+          { "offerLetterUrl": { $regex: safeEscapedPath } }
         ]
       });
 

@@ -28,7 +28,7 @@ const authLimiter = rateLimit({
 // Brute-force protection for password recovery requests and secret answer verification
 const recoveryLimiter = rateLimit({
   windowMs: isDev ? 1 * 60 * 1000 : 15 * 60 * 1000,
-  max: isDev ? 30 : 5,
+  max: isDev ? 30 : 10,
   skipSuccessfulRequests: false,
   standardHeaders: true,
   legacyHeaders: false,
@@ -44,6 +44,70 @@ const recoveryLimiter = rateLimit({
       message: isDev
         ? `Too many recovery attempts. Please wait ${retrySecs} seconds before trying again.`
         : `Too many recovery attempts. Please try again after ${retryMins} minutes.`
+    });
+  }
+});
+
+// Protection for student public registration endpoint
+const registrationLimiter = rateLimit({
+  windowMs: isDev ? 1 * 60 * 1000 : 15 * 60 * 1000,
+  max: isDev ? 100 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    const retrySecs = Math.ceil(options.windowMs / 1000);
+    res.setHeader("Retry-After", String(retrySecs));
+    return res.status(429).json({
+      success: false,
+      message: "Too many registration attempts from this IP. Please try again later."
+    });
+  }
+});
+
+// Protection for expensive file uploads and bulk imports
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDev ? 200 : 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    const retrySecs = Math.ceil(options.windowMs / 1000);
+    res.setHeader("Retry-After", String(retrySecs));
+    return res.status(429).json({
+      success: false,
+      message: "Upload rate limit reached. Please wait before uploading more files."
+    });
+  }
+});
+
+// Protection for file download and proxy streaming endpoints
+const fileDownloadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDev ? 2000 : 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    const retrySecs = Math.ceil(options.windowMs / 1000);
+    res.setHeader("Retry-After", String(retrySecs));
+    return res.status(429).json({
+      success: false,
+      message: "File download rate limit exceeded. Please try again later."
+    });
+  }
+});
+
+// Protection for computationally intensive document generation (PDF/Puppeteer)
+const documentGenerationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDev ? 300 : 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    const retrySecs = Math.ceil(options.windowMs / 1000);
+    res.setHeader("Retry-After", String(retrySecs));
+    return res.status(429).json({
+      success: false,
+      message: "Document generation limit reached. Please wait a few moments before generating more documents."
     });
   }
 });
@@ -64,4 +128,12 @@ const generalLimiter = rateLimit({
   }
 });
 
-module.exports = { authLimiter, recoveryLimiter, generalLimiter };
+module.exports = {
+  authLimiter,
+  recoveryLimiter,
+  registrationLimiter,
+  uploadLimiter,
+  fileDownloadLimiter,
+  documentGenerationLimiter,
+  generalLimiter,
+};

@@ -44,8 +44,13 @@ async function ensureBucketExists() {
 
 function cleanKey(key) {
   if (!key) return "";
-  const urlPath = key.url || key;
-  return urlPath.replace(/^\/+/, "").replace(/^uploads\/+/, "");
+  const urlPath = typeof key === "object" && key.url ? key.url : String(key);
+  return urlPath
+    .replace(/\0/g, "")
+    .replace(/\\/g, "/")
+    .replace(/\.\.+/g, "")
+    .replace(/^\/+/, "")
+    .replace(/^uploads\/+/, "");
 }
 
 async function uploadFile(buffer, key, mimeType) {

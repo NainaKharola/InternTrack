@@ -68,14 +68,47 @@ pool.query("SELECT NOW()")
     process.exit(1);
   });
 // ========================
-// Security Middleware & CORS
+// Security Middleware & CSP
 // ========================
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  contentSecurityPolicy: false,
-}));
+const isProduction = process.env.NODE_ENV === "production";
 
-const { generalLimiter } = require("./middleware/rateLimiter");
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: [
+          "'self'",
+          "https:",
+          "http://localhost:*",
+          "ws://localhost:*",
+          ...(process.env.MINIO_ENDPOINT ? [process.env.MINIO_ENDPOINT] : []),
+          ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(",").map(s => s.trim()).filter(Boolean) : [])
+        ],
+        objectSrc: ["'self'", "blob:", "data:"],
+        frameSrc: ["'self'", "blob:", "data:"],
+        frameAncestors: ["'self'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    xContentTypeOptions: true,
+    xDnsPrefetchControl: { allow: false },
+    xFrameOptions: { action: "sameorigin" },
+    hsts: isProduction
+      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+      : false,
+  })
+);
+
+const { generalLimiter, fileDownloadLimiter } = require("./middleware/rateLimiter");
 
 app.use("/api/", generalLimiter);
 
@@ -88,7 +121,7 @@ app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.includes(origin) || (!isProduction && origin.includes("localhost"))) {
         return callback(null, true);
       }
       return callback(new Error("Not allowed by CORS"));
@@ -99,11 +132,50 @@ app.use(
 );
 
 // ========================
-// Body Parser
+// Body Parser & Cookies
 // ========================
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
+
+// ========================
+// CSRF Protection for State-Changing Requests
+// ========================
+app.use((req, res, next) => {
+  // Safe HTTP read methods do not alter state
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    return next();
+  }
+
+  // Requests authenticated via explicit Authorization header are intrinsically immune to CSRF
+  const authHeader = req.headers["authorization"];
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return next();
+  }
+
+  // For requests using ambient cookies or without bearer tokens, verify origin header against allowed list
+  const origin = req.headers["origin"];
+  const referer = req.headers["referer"];
+
+  if (!origin && !referer) {
+    if (isProduction && req.cookies && Object.keys(req.cookies).length > 0) {
+      return res.status(403).json({ success: false, message: "CSRF verification failed: missing request origin." });
+    }
+    return next();
+  }
+
+  const requestOrigin = origin || (referer ? new URL(referer).origin : null);
+  const isAllowedOrigin = !requestOrigin || allowedOrigins.includes(requestOrigin) || (!isProduction && requestOrigin.includes("localhost"));
+
+  if (!isAllowedOrigin) {
+    return res.status(403).json({
+      success: false,
+      message: "CSRF verification failed: untrusted request origin."
+    });
+  }
+
+  next();
+});
 
 // Admin responses can contain sensitive registration data. Prevent browsers
 // and intermediary caches from restoring an authenticated view after logout.
@@ -114,9 +186,9 @@ app.use(["/api/admin", "/api/offer-letter"], (req, res, next) => {
 });
 
 // ========================
-// MinIO-backed upload proxy
+// MinIO-backed upload proxy with rate limiting
 // ========================
-app.use("/uploads", protectFileAccess, async (req, res, next) => {
+app.use("/uploads", fileDownloadLimiter, protectFileAccess, async (req, res, next) => {
   const relativePath = req.path.replace(/^\/+/, "");
   try {
     const stream = await getFileStream(relativePath);
