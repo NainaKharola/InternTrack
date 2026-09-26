@@ -624,7 +624,7 @@ async function updateStudentReview(req, res) {
           resignationDate: studentDoc.resignationDate,
         };
       } else if (studentDoc.trainingManagement) {
-        if (!studentDoc.trainingManagement.division && targetDivision) {
+        if (targetDivision) {
           studentDoc.trainingManagement.division = targetDivision;
         }
         studentDoc.trainingManagement.studentName = studentDoc.name;
