@@ -188,7 +188,9 @@ async function importStudentsFromExcel(buffer, options = {}) {
         (val.includes("id") && !val.includes("email") && !val.includes("guide") && !val.includes("college") && !val.includes("branch") && !val.includes("paid"))
       ) {
         candidateMap.referenceId = colNumber;
-      } else if (val.includes("collegelocation") || val.includes("collegeaddress") || (val.includes("location") && !val.includes("name")) || val === "address" || val.includes("city")) {
+      } else if (val.includes("collegeaddress") || val === "address") {
+        candidateMap.collegeAddress = colNumber;
+      } else if (val.includes("collegelocation") || (val.includes("location") && !val.includes("name")) || val.includes("city")) {
         candidateMap.collegeLocation = colNumber;
       } else if (val.includes("collegename") || val.includes("college") || val.includes("institution") || val.includes("university")) {
         candidateMap.collegeName = colNumber;
@@ -337,6 +339,11 @@ async function importStudentsFromExcel(buffer, options = {}) {
           newTraining.collegeLocation = rowValues.collegeLocation;
           trainingUpdated = true;
         }
+        if (isNonEmptyValue(rowValues.collegeAddress)) {
+          updates.collegeAddress = rowValues.collegeAddress;
+          newTraining.collegeAddress = rowValues.collegeAddress;
+          trainingUpdated = true;
+        }
         if (resolvedBranch) {
           updates.branch = resolvedBranch;
           newTraining.branch = resolvedBranch;
@@ -482,6 +489,7 @@ async function importStudentsFromExcel(buffer, options = {}) {
             branch: branch,
             collegeName: collegeName,
             collegeLocation: collegeLocation,
+            collegeAddress: isNonEmptyValue(rowValues.collegeAddress) ? rowValues.collegeAddress : "",
             trainingDuration: duration,
             division: isNonEmptyValue(rowValues.division) ? rowValues.division : "",
             seatNumber: isNonEmptyValue(rowValues.seatNumber) ? rowValues.seatNumber : "",

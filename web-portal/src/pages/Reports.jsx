@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchAdministration, fetchAdminStudents } from "../services/adminService";
 import { printPdf } from "../services/documentFileService";
 import { normalizeBranch } from "../data/branches";
+import { getStudentDivision } from "../utils/administrationAnalytics";
 import "../styles/admin.css";
 
 const REPORT_COLUMNS = [
@@ -40,7 +41,7 @@ function reportValue(student, key, index) {
     name: training.studentName || student.name || "-",
     course: training.courseName || student.course || "-",
     branch: branchVal,
-    division: training.division || student.division || "-",
+    division: getStudentDivision(student) || "-",
     year: training.courseYear || student.year || "-",
     cgpa: student.cgpa || "-",
     college: training.collegeName || student.collegeName || "-",
@@ -90,7 +91,7 @@ function Reports() {
           : filters.status === "Joined"
             ? training.joined === "Yes"
             : training.completed === "Yes";
-      const studentDiv = training.division || student.division || student.recommendedBy || "";
+      const studentDiv = getStudentDivision(student);
       if (!statusMatch || (filters.division && studentDiv !== filters.division)) return false;
       if (filters.internshipType) {
         const type = student.internshipType === "Paid" ? "Paid" : "Unpaid";
@@ -129,8 +130,8 @@ function Reports() {
           valB = tB.branch || b.branch;
           break;
         case "division":
-          valA = tA.division || a.division;
-          valB = tB.division || b.division;
+          valA = getStudentDivision(a);
+          valB = getStudentDivision(b);
           break;
         case "year":
           valA = tA.courseYear || a.year;

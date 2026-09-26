@@ -459,7 +459,8 @@ async function getStudentById(req, res) {
 }
 
 async function updateStudentReview(req, res) {
-  try {
+  return withDivisionAllocationLock(async () => {
+   try {
     const student = await Student.findById(req.params.id);
 
     if (!student) {
@@ -553,6 +554,20 @@ async function updateStudentReview(req, res) {
       student.approvedDate = new Date();
     }
 
+    const division = String(student.division || student.recommendedBy || "").trim();
+    const shouldAllocateDivision = !student.trainingManagement?.division &&
+      (student.trainingManagement || student.status === "Approved");
+    if (shouldAllocateDivision && division) {
+      const capacityError = await validateDivisionCapacity({
+        Student,
+        studentId: student._id,
+        division,
+        branch: student.branch,
+        internshipType: student.internshipType,
+      });
+      if (capacityError) return res.status(400).json({ success: false, message: capacityError });
+    }
+
     if (!student.trainingManagement && student.status === "Approved") {
       student.trainingManagement = {
         studentName: student.name,
@@ -563,13 +578,13 @@ async function updateStudentReview(req, res) {
         collegeLocation: student.location,
         trainingDuration: student.internshipDuration,
         collegeAddress: student.collegeAddress,
-        division: student.recommendedBy || student.division || "",
+        division,
         resignationStatus: student.resignationStatus || "No",
         resignationDate: student.resignationDate,
       };
     } else if (student.trainingManagement) {
-      if (!student.trainingManagement.division && (student.recommendedBy || student.division)) {
-        student.trainingManagement.division = student.recommendedBy || student.division;
+      if (!student.trainingManagement.division && division) {
+        student.trainingManagement.division = division;
       }
       student.trainingManagement.studentName = student.name;
       student.trainingManagement.courseName = student.course;
@@ -641,7 +656,8 @@ async function updateStudentReview(req, res) {
       message: "Unable to update review.",
       error: error.message,
     });
-  }
+   }
+  });
 }
 
 async function deleteStudents(req, res) {
