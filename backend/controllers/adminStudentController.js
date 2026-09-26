@@ -1,6 +1,7 @@
 const Student = require("../models/Student");
 const { generatePdfsFromHtml } = require("../services/pdfService");
 const { logActivity } = require("../utils/activityLogger");
+const { getAdministration } = require("../services/administrationService");
 const {
   certificateFileName,
   generateCertificateHtml,
@@ -556,10 +557,32 @@ async function updateStudentReview(req, res) {
         studentDoc.approvedDate = new Date();
       }
 
-      const fallbackDivision = String(studentDoc.division || studentDoc.recommendedBy || "").trim();
+      const administration = await getAdministration();
+      const configuredDivisions = administration?.divisions || [];
+      const findConfiguredDivision = (value) => {
+        const trimmed = String(value || "").trim().toLowerCase();
+        return trimmed
+          ? configuredDivisions.find((d) => String(d || "").trim().toLowerCase() === trimmed)
+          : undefined;
+      };
+
+      const rootDivision = String(studentDoc.division || "").trim();
+      const recommendedDivision = String(studentDoc.recommendedBy || "").trim();
+      let fallbackDivision = "";
+
+      if (rootDivision) {
+        fallbackDivision = findConfiguredDivision(rootDivision) || rootDivision;
+      } else if (recommendedDivision) {
+        const matchingConfigured = findConfiguredDivision(recommendedDivision);
+        if (matchingConfigured) {
+          fallbackDivision = matchingConfigured;
+        }
+      }
+
       let targetDivision = "";
       if (studentDoc.trainingManagement) {
-        targetDivision = String(studentDoc.trainingManagement.division || fallbackDivision).trim();
+        const trainingDiv = String(studentDoc.trainingManagement.division || "").trim();
+        targetDivision = trainingDiv ? (findConfiguredDivision(trainingDiv) || trainingDiv) : fallbackDivision;
       } else if (studentDoc.status === "Approved") {
         targetDivision = fallbackDivision;
       }
