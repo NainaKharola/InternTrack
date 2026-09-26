@@ -1,7 +1,13 @@
 import { normalizeBranch } from "../data/branches.js";
 
 export function getStudentDivision(student) {
-  return student.trainingManagement?.division || student.division || student.recommendedBy || "";
+  const trainingDiv = String(student?.trainingManagement?.division || "").trim();
+  if (trainingDiv) return trainingDiv;
+  const studentDiv = String(student?.division || "").trim();
+  if (studentDiv) return studentDiv;
+  const recommendedBy = String(student?.recommendedBy || "").trim();
+  if (recommendedBy) return recommendedBy;
+  return "";
 }
 
 export function getConfiguredStudentDivision(student, divisions) {

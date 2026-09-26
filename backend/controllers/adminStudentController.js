@@ -459,156 +459,203 @@ async function getStudentById(req, res) {
 }
 
 async function updateStudentReview(req, res) {
-  return withDivisionAllocationLock(async () => {
-   try {
-    const student = await Student.findById(req.params.id);
+  let student;
+  let wasRejected;
+  let oldStatus;
 
-    if (!student) {
+  try {
+    const lockResult = await withDivisionAllocationLock(async () => {
+      const studentDoc = await Student.findById(req.params.id);
+
+      if (!studentDoc) {
+        return { notFound: true };
+      }
+
+      if (studentDoc.internshipType === "Paid" && req.body.internshipDuration !== undefined) {
+        const rawDuration = req.body.internshipDuration || studentDoc.internshipDuration || "6 Months";
+        const duration = normalizePaidDuration(rawDuration);
+        if (!duration) {
+          return { validationError: "Enter a whole number of months for a paid internship." };
+        }
+        req.body.internshipDuration = duration;
+      }
+
+      if (req.body.status !== undefined && !allowedStatuses.includes(req.body.status)) {
+        return { validationError: "Select a valid status." };
+      }
+
+      const wasRejectedDoc = studentDoc.status === "Rejected";
+      const oldStatusDoc = studentDoc.status;
+      const wasApproved = studentDoc.status === "Approved";
+      const oldDivision = String(studentDoc.trainingManagement?.division || "").trim();
+      const oldBranch = String(studentDoc.trainingManagement?.branch || studentDoc.branch || "").trim();
+      const oldInternshipType = studentDoc.internshipType || "Unpaid";
+
+      reviewFields.forEach((field) => {
+        if (req.body[field] !== undefined) {
+          studentDoc[field] = req.body[field];
+        }
+      });
+
+      if (req.body.name !== undefined) studentDoc.name = req.body.name;
+      if (req.body.gender !== undefined) studentDoc.gender = req.body.gender;
+      if (req.body.course !== undefined) studentDoc.course = req.body.course;
+      if (req.body.branch !== undefined) studentDoc.branch = req.body.branch;
+      if (req.body.dob !== undefined) studentDoc.dob = req.body.dob;
+
+      if (req.body.internshipDuration !== undefined) studentDoc.internshipDuration = req.body.internshipDuration;
+      if (req.body.permissionLetterNumber !== undefined) studentDoc.permissionLetterNumber = req.body.permissionLetterNumber;
+      if (req.body.permissionLetterDate !== undefined) studentDoc.permissionLetterDate = req.body.permissionLetterDate;
+      if (req.body.internshipJoiningMonth !== undefined) studentDoc.internshipJoiningMonth = req.body.internshipJoiningMonth;
+
+      if (req.body.resignationStatus !== undefined) {
+        studentDoc.resignationStatus = req.body.resignationStatus;
+        if (studentDoc.trainingManagement) studentDoc.trainingManagement.resignationStatus = req.body.resignationStatus;
+      }
+      if (req.body.resignationDate !== undefined) {
+        studentDoc.resignationDate = req.body.resignationDate ? new Date(req.body.resignationDate) : null;
+        if (studentDoc.trainingManagement) studentDoc.trainingManagement.resignationDate = studentDoc.resignationDate;
+      }
+      if (req.body.paidInternshipProjectDetails !== undefined) {
+        studentDoc.paidInternshipProjectDetails = {
+          ...studentDoc.paidInternshipProjectDetails,
+          ...req.body.paidInternshipProjectDetails
+        };
+      }
+      if (req.body.bankDetails !== undefined) {
+        studentDoc.bankDetails = {
+          ...studentDoc.bankDetails,
+          ...req.body.bankDetails
+        };
+      }
+      if (req.body.firstQuarterReport !== undefined) {
+        studentDoc.firstQuarterReport = {
+          ...studentDoc.firstQuarterReport,
+          ...req.body.firstQuarterReport
+        };
+      }
+      if (req.body.secondQuarterReport !== undefined) {
+        studentDoc.secondQuarterReport = {
+          ...studentDoc.secondQuarterReport,
+          ...req.body.secondQuarterReport
+        };
+      }
+      if (req.body.trainingManagement !== undefined) {
+        studentDoc.trainingManagement = {
+          ...studentDoc.trainingManagement,
+          ...req.body.trainingManagement,
+          resignationStatus: studentDoc.resignationStatus,
+          resignationDate: studentDoc.resignationDate
+        };
+      }
+
+      studentDoc.reviewedBy = req.admin.email;
+      studentDoc.reviewedAt = new Date();
+
+      if (studentDoc.status === "Approved" && !studentDoc.approvedDate) {
+        studentDoc.approvedDate = new Date();
+      }
+
+      const fallbackDivision = String(studentDoc.division || studentDoc.recommendedBy || "").trim();
+      let targetDivision = "";
+      if (studentDoc.trainingManagement) {
+        targetDivision = String(studentDoc.trainingManagement.division || fallbackDivision).trim();
+      } else if (studentDoc.status === "Approved") {
+        targetDivision = fallbackDivision;
+      }
+
+      const isApproved = studentDoc.status === "Approved";
+      const branchChanged = oldBranch !== String(studentDoc.branch || "").trim();
+      const divisionChanged = oldDivision !== targetDivision;
+      const typeChanged = oldInternshipType !== (studentDoc.internshipType || "Unpaid");
+
+      const increasesApprovedAllocation = isApproved && Boolean(targetDivision) && (
+        !wasApproved || divisionChanged || branchChanged || typeChanged
+      );
+
+      if (increasesApprovedAllocation) {
+        const capacityError = await validateDivisionCapacity({
+          Student,
+          studentId: studentDoc._id,
+          division: targetDivision,
+          branch: studentDoc.branch,
+          internshipType: studentDoc.internshipType,
+        });
+        if (capacityError) {
+          return { capacityError };
+        }
+      }
+
+      if (!studentDoc.trainingManagement && studentDoc.status === "Approved") {
+        studentDoc.trainingManagement = {
+          studentName: studentDoc.name,
+          courseName: studentDoc.course,
+          courseYear: studentDoc.year,
+          branch: studentDoc.branch,
+          collegeName: studentDoc.collegeName,
+          collegeLocation: studentDoc.location,
+          trainingDuration: studentDoc.internshipDuration,
+          collegeAddress: studentDoc.collegeAddress,
+          division: targetDivision,
+          resignationStatus: studentDoc.resignationStatus || "No",
+          resignationDate: studentDoc.resignationDate,
+        };
+      } else if (studentDoc.trainingManagement) {
+        if (!studentDoc.trainingManagement.division && targetDivision) {
+          studentDoc.trainingManagement.division = targetDivision;
+        }
+        studentDoc.trainingManagement.studentName = studentDoc.name;
+        studentDoc.trainingManagement.courseName = studentDoc.course;
+        studentDoc.trainingManagement.courseYear = studentDoc.year;
+        studentDoc.trainingManagement.branch = studentDoc.branch;
+        studentDoc.trainingManagement.collegeName = studentDoc.collegeName;
+        studentDoc.trainingManagement.collegeLocation = studentDoc.location;
+        studentDoc.trainingManagement.trainingDuration = studentDoc.internshipDuration;
+        studentDoc.trainingManagement.collegeAddress = studentDoc.collegeAddress;
+      }
+
+      if (studentDoc.offerLetter) {
+        studentDoc.offerLetter.studentName = studentDoc.name;
+        studentDoc.offerLetter.course = studentDoc.course;
+        studentDoc.offerLetter.year = studentDoc.year;
+        studentDoc.offerLetter.branch = studentDoc.branch;
+        studentDoc.offerLetter.collegeName = studentDoc.collegeName;
+        studentDoc.offerLetter.collegeLocation = studentDoc.location;
+        studentDoc.offerLetter.internshipDuration = studentDoc.internshipDuration;
+        studentDoc.offerLetter.collegeAddress = studentDoc.collegeAddress;
+        delete studentDoc.offerLetter.html;
+      }
+
+      await studentDoc.save();
+      return {
+        student: studentDoc,
+        wasRejected: wasRejectedDoc,
+        oldStatus: oldStatusDoc
+      };
+    });
+
+    if (lockResult.notFound) {
       return res.status(404).json({
         success: false,
         message: "Student not found.",
       });
     }
-
-    if (student.internshipType === "Paid" && req.body.internshipDuration !== undefined) {
-      const rawDuration = req.body.internshipDuration || student.internshipDuration || "6 Months";
-      const duration = normalizePaidDuration(rawDuration);
-      if (!duration) {
-        return res.status(400).json({ success: false, message: "Enter a whole number of months for a paid internship." });
-      }
-      req.body.internshipDuration = duration;
-    }
-
-    if (req.body.status !== undefined && !allowedStatuses.includes(req.body.status)) {
+    if (lockResult.validationError) {
       return res.status(400).json({
         success: false,
-        message: "Select a valid status.",
+        message: lockResult.validationError,
+      });
+    }
+    if (lockResult.capacityError) {
+      return res.status(400).json({
+        success: false,
+        message: lockResult.capacityError,
       });
     }
 
-    const wasRejected = student.status === "Rejected";
-    const oldStatus = student.status;
-
-    reviewFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        student[field] = req.body[field];
-      }
-    });
-
-    if (req.body.name !== undefined) student.name = req.body.name;
-    if (req.body.gender !== undefined) student.gender = req.body.gender;
-    if (req.body.course !== undefined) student.course = req.body.course;
-    if (req.body.branch !== undefined) student.branch = req.body.branch;
-    if (req.body.dob !== undefined) student.dob = req.body.dob;
-    
-    if (req.body.internshipDuration !== undefined) student.internshipDuration = req.body.internshipDuration;
-    if (req.body.permissionLetterNumber !== undefined) student.permissionLetterNumber = req.body.permissionLetterNumber;
-    if (req.body.permissionLetterDate !== undefined) student.permissionLetterDate = req.body.permissionLetterDate;
-    if (req.body.internshipJoiningMonth !== undefined) student.internshipJoiningMonth = req.body.internshipJoiningMonth;
-
-    if (req.body.resignationStatus !== undefined) {
-      student.resignationStatus = req.body.resignationStatus;
-      if (student.trainingManagement) student.trainingManagement.resignationStatus = req.body.resignationStatus;
-    }
-    if (req.body.resignationDate !== undefined) {
-      student.resignationDate = req.body.resignationDate ? new Date(req.body.resignationDate) : null;
-      if (student.trainingManagement) student.trainingManagement.resignationDate = student.resignationDate;
-    }
-    if (req.body.paidInternshipProjectDetails !== undefined) {
-      student.paidInternshipProjectDetails = {
-        ...student.paidInternshipProjectDetails,
-        ...req.body.paidInternshipProjectDetails
-      };
-    }
-    if (req.body.bankDetails !== undefined) {
-      student.bankDetails = {
-        ...student.bankDetails,
-        ...req.body.bankDetails
-      };
-    }
-    if (req.body.firstQuarterReport !== undefined) {
-      student.firstQuarterReport = {
-        ...student.firstQuarterReport,
-        ...req.body.firstQuarterReport
-      };
-    }
-    if (req.body.secondQuarterReport !== undefined) {
-      student.secondQuarterReport = {
-        ...student.secondQuarterReport,
-        ...req.body.secondQuarterReport
-      };
-    }
-    if (req.body.trainingManagement !== undefined) {
-      student.trainingManagement = {
-        ...student.trainingManagement,
-        ...req.body.trainingManagement,
-        resignationStatus: student.resignationStatus,
-        resignationDate: student.resignationDate
-      };
-    }
-
-    student.reviewedBy = req.admin.email;
-    student.reviewedAt = new Date();
-
-    if (student.status === "Approved" && !student.approvedDate) {
-      student.approvedDate = new Date();
-    }
-
-    const division = String(student.division || student.recommendedBy || "").trim();
-    const shouldAllocateDivision = !student.trainingManagement?.division &&
-      (student.trainingManagement || student.status === "Approved");
-    if (shouldAllocateDivision && division) {
-      const capacityError = await validateDivisionCapacity({
-        Student,
-        studentId: student._id,
-        division,
-        branch: student.branch,
-        internshipType: student.internshipType,
-      });
-      if (capacityError) return res.status(400).json({ success: false, message: capacityError });
-    }
-
-    if (!student.trainingManagement && student.status === "Approved") {
-      student.trainingManagement = {
-        studentName: student.name,
-        courseName: student.course,
-        courseYear: student.year,
-        branch: student.branch,
-        collegeName: student.collegeName,
-        collegeLocation: student.location,
-        trainingDuration: student.internshipDuration,
-        collegeAddress: student.collegeAddress,
-        division,
-        resignationStatus: student.resignationStatus || "No",
-        resignationDate: student.resignationDate,
-      };
-    } else if (student.trainingManagement) {
-      if (!student.trainingManagement.division && division) {
-        student.trainingManagement.division = division;
-      }
-      student.trainingManagement.studentName = student.name;
-      student.trainingManagement.courseName = student.course;
-      student.trainingManagement.courseYear = student.year;
-      student.trainingManagement.branch = student.branch;
-      student.trainingManagement.collegeName = student.collegeName;
-      student.trainingManagement.collegeLocation = student.location;
-      student.trainingManagement.trainingDuration = student.internshipDuration;
-      student.trainingManagement.collegeAddress = student.collegeAddress;
-    }
-
-    if (student.offerLetter) {
-      student.offerLetter.studentName = student.name;
-      student.offerLetter.course = student.course;
-      student.offerLetter.year = student.year;
-      student.offerLetter.branch = student.branch;
-      student.offerLetter.collegeName = student.collegeName;
-      student.offerLetter.collegeLocation = student.location;
-      student.offerLetter.internshipDuration = student.internshipDuration;
-      student.offerLetter.collegeAddress = student.collegeAddress;
-      delete student.offerLetter.html;
-    }
-
-    await student.save();
+    student = lockResult.student;
+    wasRejected = lockResult.wasRejected;
+    oldStatus = lockResult.oldStatus;
 
     let emailResult = null;
 
@@ -656,8 +703,7 @@ async function updateStudentReview(req, res) {
       message: "Unable to update review.",
       error: error.message,
     });
-   }
-  });
+  }
 }
 
 async function deleteStudents(req, res) {
