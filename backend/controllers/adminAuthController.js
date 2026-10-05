@@ -90,7 +90,8 @@ async function registerAdmin(req, res) {
 
 async function loginAdmin(req, res) {
   try {
-    const { email, password } = req.body;
+    const email = String(req.body.email || "").trim();
+    const password = String(req.body.password || "");
 
     if (!email || !password) {
       return res.status(400).json({
@@ -99,7 +100,10 @@ async function loginAdmin(req, res) {
       });
     }
 
-    const admin = await Admin.findOne({ email }).select("+password");
+    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, "\\const admin = await Admin.findOne({ email }).select("+password");");
+    const admin = await Admin.findOne({
+      email: new RegExp("^" + escapedEmail + "$", "i")
+    }).select("+password");
 
     if (!admin) {
       return res.status(401).json({
@@ -122,6 +126,15 @@ async function loginAdmin(req, res) {
         success: false,
         message: "Invalid email or password.",
       });
+    }
+
+    if (!admin.password.startsWith("$2")) {
+      try {
+        admin.password = password;
+        await admin.save();
+      } catch (saveErr) {
+        console.error("Non-fatal error upgrading legacy admin password:", saveErr.message);
+      }
     }
 
     const token = signToken(admin);
@@ -783,7 +796,10 @@ async function getForgotPasswordQuestions(req, res) {
     if (!email) {
       return res.status(400).json({ success: false, message: "Email address is required." });
     }
-    const admin = await Admin.findOne({ email });
+    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, "\\const admin = await Admin.findOne({ email });");
+    const admin = await Admin.findOne({
+      email: new RegExp("^" + escapedEmail + "$", "i")
+    });
     if (!admin) {
       return res.status(404).json({ success: false, message: "No recovery questions configured for this email." });
     }
@@ -819,7 +835,10 @@ async function verifyRecoveryAnswer(req, res) {
       return res.status(400).json({ success: false, message: "Email, question ID, and answer are required." });
     }
 
-    const admin = await Admin.findOne({ email }).select("+password +secretAnswer");
+    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, "\\const admin = await Admin.findOne({ email }).select("+password +secretAnswer");");
+    const admin = await Admin.findOne({
+      email: new RegExp("^" + escapedEmail + "$", "i")
+    }).select("+password +secretAnswer");
     if (!admin) {
       return res.status(400).json({ success: false, message: "Invalid recovery attempt." });
     }

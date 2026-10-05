@@ -12,11 +12,17 @@ module.exports = createPostgresModel("admins.json", {}, {
   },
   async matchPassword(candidate) {
     if (!this.password || !candidate) return false;
-    return bcrypt.compare(candidate, this.password);
+    if (this.password.startsWith("$2")) {
+      return bcrypt.compare(candidate, this.password);
+    }
+    return this.password === candidate;
   },
   async matchSecretAnswer(candidate) {
     if (!this.secretAnswer || !candidate) return false;
-    return bcrypt.compare(candidate.trim().toLowerCase(), this.secretAnswer);
+    if (this.secretAnswer.startsWith("$2")) {
+      return bcrypt.compare(candidate.trim().toLowerCase(), this.secretAnswer);
+    }
+    return this.secretAnswer.trim().toLowerCase() === candidate.trim().toLowerCase();
   },
   async matchSecurityQuestionAnswer(questionId, candidateAnswer) {
     if (!candidateAnswer) return false;
@@ -30,6 +36,9 @@ module.exports = createPostgresModel("admins.json", {}, {
     }
     const hash = q.answer_hash || q.answer;
     if (!hash) return false;
-    return bcrypt.compare(candidateAnswer.trim().toLowerCase(), hash);
+    if (hash.startsWith("$2")) {
+      return bcrypt.compare(candidateAnswer.trim().toLowerCase(), hash);
+    }
+    return hash.trim().toLowerCase() === candidateAnswer.trim().toLowerCase();
   },
 });

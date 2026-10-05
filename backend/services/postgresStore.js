@@ -1,27 +1,40 @@
-const pool = require("../db");
 const crypto = require("crypto");
+const pool = require("../db");
 const { encrypt, decrypt } = require("../utils/encryption");
 
-const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-const getValue = (object, key) => key.split(".").reduce((value, part) => value?.[part], object);
+
+function clone(value) {
+    if (value === undefined || value === null) return value;
+    return JSON.parse(JSON.stringify(value));
+}
+
+
+function getValue(record, path) {
+    return String(path)
+        .split(".")
+        .reduce((current, key) => (current && current[key] !== undefined ? current[key] : undefined), record);
+}
+
 
 function matchesCondition(value, condition) {
-    if (condition && typeof condition === "object" && !Array.isArray(condition)) {
+    if (condition instanceof RegExp) return condition.test(String(value ?? ""));
+    if (condition && typeof condition === "object") {
         return Object.entries(condition).every(([operator, expected]) => {
-            if (operator === "$in") return expected.map(String).includes(String(value));
+            if (operator === "$in") return Array.isArray(expected) && expected.map(String).includes(String(value));
+            if (operator === "$nin") return Array.isArray(expected) && !expected.map(String).includes(String(value));
             if (operator === "$ne") return String(value) !== String(expected);
-            if (operator === "$exists") return expected ? value !== undefined : value === undefined;
-            if (operator === "$regex") return new RegExp(expected, condition.$options || "").test(String(value || ""));
-            if (operator === "$options") return true;
+            if (operator === "$regex") return new RegExp(expected, condition.$options || "").test(String(value ?? ""));
             if (operator === "$gte") return new Date(value).getTime() >= new Date(expected).getTime();
             if (operator === "$lte") return new Date(value).getTime() <= new Date(expected).getTime();
             if (operator === "$gt") return new Date(value).getTime() > new Date(expected).getTime();
             if (operator === "$lt") return new Date(value).getTime() < new Date(expected).getTime();
+            if (operator === "$exists") return expected ? value !== undefined : value === undefined;
             return false;
         });
     }
     return String(value) === String(condition);
 }
+
 
 function matches(record, filter = {}) {
     return Object.entries(filter).every(([key, condition]) => {
@@ -31,10 +44,11 @@ function matches(record, filter = {}) {
     });
 }
 
+
 function applyUpdate(record, update = {}) {
     const next = { ...record, ...clone(update) };
     delete next.$set;
-    Object.entries(update.$set || {}).forEach(([key, value]) => {
+    Object.entries(update.$set || {}).setForEach(([key, value]) => {
         const parts = key.split("."); let target = next;
         while (parts.length > 1) { const part = parts.shift(); target[part] ||= {}; target = target[part]; }
         target[parts[0]] = value;
@@ -42,11 +56,12 @@ function applyUpdate(record, update = {}) {
     return next;
 }
 
+
 function project(record, projection) {
     if (!projection) return record;
     const tokens = String(projection).split(/\s+/).filter(Boolean);
     const includeAll = tokens.some((token) => token.startsWith("+"));
-    const keys = tokens.map((key) => key.replace(/^\+/, ""));
+    const keys = tokens.map((key) => key.replace(/^+/, ""));
     if (includeAll) {
         return { ...record };
     }
@@ -78,6 +93,7 @@ function encryptDocument(record, fileName) {
     return cloned;
 }
 
+
 function decryptDocument(record, fileName) {
     if (!record) return record;
     const cloned = clone(record);
@@ -90,7 +106,6 @@ function decryptDocument(record, fileName) {
                 const decryptedStr = decrypt(cloned.bankDetails);
                 cloned.bankDetails = JSON.parse(decryptedStr);
             } catch (e) {
-                // If it starts with '{' but decryption didn't apply, try parsing direct
                 if (typeof cloned.bankDetails === "string" && cloned.bankDetails.trim().startsWith("{")) {
                     try { cloned.bankDetails = JSON.parse(cloned.bankDetails); } catch (err) {}
                 }
@@ -100,17 +115,25 @@ function decryptDocument(record, fileName) {
     return cloned;
 }
 
+
 async function readTable(fileName) {
     const map = mapping[fileName];
-    if (!map) throw new Error("Unknown storage filename: " + fileName);
+    if (!map) throw new Error("unknown storage filename: " + fileName);
     try {
-        const res = await pool.query(`SELECT ${map.column} FROM ${map.table}`);
-        return res.rows.map(row => decryptDocument(row[map.column], fileName));
+        const res = await pool.query(`SELECT id, ${map.column} FROM ${map.table}`);
+        return res.rows.map(row => {
+            const doc = decryptDocument(row[map.column], fileName);
+            if (doc && typeof doc === "object" && !Array.isArray(doc)) {
+                doc._id = doc._id || String(row.id);
+            }
+            return doc;
+        });
     } catch (error) {
         console.error(`Error reading from table ${map.table}:`, error);
         return [];
     }
 }
+
 
 class PostgresQuery {
     constructor(loader, Document) { this.loader = loader; this.Document = Document; this.projection = null; this.sortSpec = null; }
@@ -131,6 +154,7 @@ class PostgresQuery {
     then(resolve, reject) { return this.records().then(resolve, reject); }
 }
 
+
 function createPostgresModel(fileName, defaults = {}, methods = {}) {
     class PostgresDocument {
         constructor(data = {}) { Object.assign(this, clone({ ...defaults, ...data })); this._id ||= crypto.randomBytes(12).toString("hex"); }
@@ -140,57 +164,17 @@ function createPostgresModel(fileName, defaults = {}, methods = {}) {
             const record = encryptDocument(this.toObject(), fileName);
             const map = mapping[fileName];
 
+
             const checkRes = await pool.query(
-                `SELECT id FROM ${map.table} WHERE ${map.column}->>'_id' = $1`,
+                `SELECT id FROM ${map.table} WHERE ${map.column}->>'_id' = $1 OR id::text = $1`,
                 [this._id]
             );
 
+
             if (checkRes.rows.length > 0) {
+                const rowId = checkRes.rows[0].id;
                 let updateQuery;
                 if (map.table === "students" || map.table === "admins") {
-                    updateQuery = `UPDATE ${map.table} SET ${map.column} = $1, updated_at = NOW() WHERE ${map.column}->>'_id' = $2`;
+                    updateQuery = `UPDATE ${map.table} SEU ${map.column} = $1, updated_at = NOW() WHERE id = $2`;
                 } else {
-                    updateQuery = `UPDATE ${map.table} SET ${map.column} = $1 WHERE ${map.column}->>'_id' = $2`;
-                }
-                await pool.query(updateQuery, [record, this._id]);
-            } else {
-                await pool.query(
-                    `INSERT INTO ${map.table} (${map.column}) VALUES ($1)`,
-                    [record]
-                );
-            }
-            return this;
-        }
-    }
-    Object.assign(PostgresDocument.prototype, methods);
-    const Model = function Model(data) { return new PostgresDocument(data); };
-    const records = () => readTable(fileName);
-    Model.find = (filter = {}, projection) => new PostgresQuery(async () => (await records()).filter((record) => matches(record, filter)), PostgresDocument).select(projection);
-    Model.findOne = (filter = {}) => {
-        const query = new PostgresQuery(async () => (await records()).filter((item) => matches(item, filter)), PostgresDocument);
-        query.lean = async () => (await query.records())[0] || null;
-        query.then = (resolve, reject) => query.records().then((items) => resolve(items[0] ? new PostgresDocument(items[0]) : null), reject);
-        return query;
-    };
-    Model.findById = (id) => Model.findOne({ _id: id });
-    Model.create = async (data) => new PostgresDocument(data).save();
-    Model.exists = async (filter = {}) => Boolean((await records()).find((record) => matches(record, filter)));
-    Model.countDocuments = async (filter = {}) => (await records()).filter((record) => matches(record, filter)).length;
-    Model.findByIdAndUpdate = async (id, update) => { const document = await Model.findById(id); if (!document) return null; Object.assign(document, applyUpdate(document.toObject(), update)); return document.save(); };
-    Model.deleteMany = async (filter = {}) => {
-        const all = await records();
-        const matching = all.filter((record) => matches(record, filter));
-        const matchingIds = matching.map(r => r._id);
-        if (matchingIds.length > 0) {
-            const map = mapping[fileName];
-            await pool.query(
-                `DELETE FROM ${map.table} WHERE ${map.column}->>'_id' = ANY($1)`,
-                [matchingIds]
-            );
-        }
-        return { deletedCount: matching.length };
-    };
-    return Model;
-}
-
-module.exports = { createPostgresModel };
+                    updateQuery = `UAQ�������х����MT����������յ���ā]!I�����ɀ�(�����������������(�����������������݅�Ё������Օ������ѕEՕ�䰁mɕ��ɐ��ɽ�%�t��(������������􁕱͔��(�����������������݅�Ё������Օ��(���������������������%9MIP�%9Q<�������х���􀠑��������յ����Y1UL���ĥ��(��������������������mɕ��ɑt(������������������(�������������(������������ɕ��ɸ�ѡ���(���������(�����(����=����й��ͥ���A��ѝɕ���յ��й�ɽѽ��������ѡ��̤�(��������Ё5������չ�ѥ���5�������ф���ɕ��ɸ���܁A��ѝɕ���յ��С��ф����(��������Ёɕ��ɑ̀􀠤����ɕ��Q���������9�����(����5����������􀡙��ѕȀ������ɽ���ѥ���������܁A��ѝɕ�EՕ�䡅�幌���������݅�Ёɕ��ɑ̠������ѕȠ�ɕ��ɐ�������э��̡ɕ��ɐ�����ѕȤ���A��ѝɕ���յ��Ф�͕���С�ɽ���ѥ����(����5���������=���􀡙��ѕȀ���������(������������Ё�Օ��􁹕܁A��ѝɕ�EՕ�䡅�幌���������݅�Ёɕ��ɑ̠������ѕȠ��ѕ��������э��̡�ѕ������ѕȤ���A��ѝɕ���յ��Ф�(���������Օ�乱������幌���������݅�Ё�Օ��ɕ��ɑ̠��l�t�����ձ��(���������Օ��ѡ����ɕͽ�ٔ��ɕ���Ф�����Օ��ɕ��ɑ̠��ѡ�����ѕ�̤����ɕͽ�ٔ��ѕ��l�t�����܁A��ѝɕ���յ��С�ѕ��l�t��聹ձ����ɕ���Ф�(��������ɕ��ɸ��Օ���(������(����5���������	�%��􀡥������5���������=����}��聥�����(����5������ɕ�є���幌����ф�������܁A��ѝɕ���յ��С��ф��ٔͅ���(����5���������̀��幌�����ѕȀ��������	���������݅�Ёɕ��ɑ̠���������ɕ��ɐ�������э��̡ɕ��ɐ�����ѕȤ���(����5�������չ���յ���̀��幌�����ѕȀ����������݅�Ёɕ��ɑ̠������ѕȠ�ɕ��ɐ�������э��̡ɕ��ɐ�����ѕȤ������Ѡ�(����5���������	�%���U���є���幌����������є�����쁍���Ё���յ��Ѐ�݅�Ё5���������	�%�����쁥�������յ��Ф�ɕ��ɸ��ձ��=����й��ͥ������յ��а������U���є����յ��йѽ=����Р�������є���ɕ��ɸ����յ��йٔͅ�����(����5���������ѕ5�����幌�����ѕȀ���������(������������Ё�����݅�Ёɕ��ɑ̠��(������������Ё��э�����􁅱�����ѕȠ�ɕ��ɐ�������э��̡ɕ��ɐ�����ѕȤ��(������������Ё��э����%�̀􁵅э���������Ȁ���ȹ}�������ѕȡ	��������(��������������э����%�̹����Ѡ�������(����������������Ё����􁵅�����m����9���t�(�������������݅�Ё������Օ��(�����������������1Q�I=4�������х����]!I���ф����}�����9d��Ĥ�=H�����ѕ�Ѐ�9d��ĥ��(����������������m��э����%��t(��������������(���������(��������ɕ��ɸ�쁑���ѕ��չ�聵�э���������Ѡ���(������(����ɕ��ɸ�5�����)�(()���ձ��������̀�쁍ɕ�ѕA��ѝɕ�5�������(
