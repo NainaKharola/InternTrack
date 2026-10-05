@@ -41,9 +41,9 @@ Puppeteer for dynamic document generation
                                       │ REST API
                                       ▼
                          ┌─────────────────────────┐
-                         │    Node.js + Express     │
-                         │        Backend           │
-                         │     localhost:5000       │
+                         │    Node.js + Express    │
+                         │        Backend          │
+                         │     localhost:5000      │
                          └────────────┬────────────┘
                                       │
                          ┌────────────┴────────────┐
@@ -55,9 +55,9 @@ Puppeteer for dynamic document generation
                 │ Student Data    │       │ Photos          │
                 │ Admin Data      │       │ Resumes         │
                 │ Configuration   │       │ Result Files    │
-                │ Activity Logs   │       │ Certificates     │
+                │ Activity Logs   │       │ Certificates    │
                 │ Gyapan Data     │       │ Offer Letters   │
-                │ Certificates    │       │ Other Documents│
+                │ Certificates    │       │ Other Documents │
                 └─────────────────┘       └─────────────────┘
                                       │
                                       ▼
