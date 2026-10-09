@@ -24,7 +24,7 @@ Activity logging
 Duration management
 System configuration
 
-The application uses:
+The application uses of the Interntrack:
 
 React + Vite for the frontend
 Node.js + Express for the backend
